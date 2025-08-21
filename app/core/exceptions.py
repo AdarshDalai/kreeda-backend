@@ -78,12 +78,26 @@ def setup_exception_handlers(app: FastAPI):
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
         """Handle request validation errors."""
         logger.error(f"Validation error: {exc.errors()}")
+        
+        # Serialize validation errors properly
+        serializable_errors = []
+        for error in exc.errors():
+            error_dict = {
+                "type": error.get("type"),
+                "loc": error.get("loc"),
+                "msg": str(error.get("msg")),
+                "input": str(error.get("input")) if error.get("input") is not None else None
+            }
+            if "ctx" in error:
+                error_dict["ctx"] = {k: str(v) for k, v in error["ctx"].items()}
+            serializable_errors.append(error_dict)
+        
         return JSONResponse(
             status_code=422,
             content={
                 "error": True,
                 "message": "Validation failed",
-                "details": exc.errors(),
+                "details": serializable_errors,
                 "type": "ValidationError"
             }
         )

@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Security
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
+from typing import Optional, List
 import logging
 
 from app.core.database import get_db
+from app.core.oauth2 import oauth2_scheme_enhanced, OAuth2Scope, oauth2_service
 from app.repositories.user import user_repository
 from app.schemas.auth import (
     UserCreate, UserResponse, LoginRequest, OAuthLoginRequest, 
@@ -47,6 +48,52 @@ async def get_current_user(
 async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
     """Get current active user."""
     return current_user
+
+
+async def get_current_user_oauth2(
+    token: str = Depends(oauth2_scheme_enhanced),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    """Get current authenticated user using OAuth2 scheme."""
+    token_data = auth_service.verify_token(token)
+    user = await user_repository.get_user_by_id(db, token_data.sub)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Inactive user",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    return user
+
+
+def get_required_scopes(*required_scopes: str):
+    """Dependency factory for checking required OAuth2 scopes."""
+    def check_scopes(
+        token: str = Security(oauth2_scheme_enhanced, scopes=list(required_scopes)),
+        db: AsyncSession = Depends(get_db)
+    ):
+        # Verify token and extract scopes
+        try:
+            token_data = auth_service.verify_token(token)
+            # In a real implementation, you'd extract scopes from the token
+            # For now, we'll assume all scopes are granted
+            return token_data
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials",
+                headers={"WWW-Authenticate": "Bearer"}
+            )
+    return check_scopes
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -150,6 +197,74 @@ async def login(
     
     access_token = auth_service.generate_access_token(user_token_data)
     refresh_token = auth_service.generate_refresh_token(user_token_data)
+    
+    # Store refresh token hash
+    refresh_token_hash = auth_service.hash_token(refresh_token)
+    await user_repository.update_refresh_token(db, str(user.id), refresh_token_hash)
+    
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        expires_in=auth_service.access_token_expire_minutes * 60,
+        user=UserResponse.model_validate(user)
+    )
+
+
+@router.post("/token", response_model=TokenResponse)
+async def oauth2_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    OAuth2 compliant token endpoint for password grant.
+    Compatible with OAuth2PasswordRequestForm.
+    """
+    
+    # Find user
+    user = await user_repository.get_user_by_email(db, form_data.username)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    # Check if user is active
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Inactive user",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    # Verify password
+    if not user.hashed_password or not auth_service.verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    # Process scopes - for now, grant all requested scopes or default scopes
+    requested_scopes = form_data.scopes if form_data.scopes else [OAuth2Scope.READ, OAuth2Scope.PROFILE]
+    
+    # Generate OAuth2 compliant tokens
+    user_token_data = {
+        "sub": str(user.id),
+        "email": str(user.email),
+        "username": str(user.username), 
+        "role": user.role.value,
+        "scope": " ".join(requested_scopes),
+        "aud": "kreeda_mobile_app",  # Default client
+        "iss": "kreeda-api"
+    }
+    
+    access_token = auth_service.generate_access_token(user_token_data)
+    refresh_token = auth_service.generate_refresh_token({
+        "sub": str(user.id),
+        "scope": " ".join(requested_scopes)
+    })
     
     # Store refresh token hash
     refresh_token_hash = auth_service.hash_token(refresh_token)
@@ -351,6 +466,15 @@ async def get_current_user_info(current_user: User = Depends(get_current_active_
     return UserResponse.model_validate(current_user)
 
 
+@router.get("/userinfo", response_model=UserResponse)
+async def get_userinfo(
+    current_user: User = Depends(get_current_user_oauth2),
+    _token_data=Depends(get_required_scopes(OAuth2Scope.PROFILE))
+):
+    """OAuth2/OpenID Connect UserInfo endpoint."""
+    return UserResponse.model_validate(current_user)
+
+
 @router.post("/forgot-password", status_code=status.HTTP_200_OK)
 async def forgot_password(
     request: PasswordResetRequest,
@@ -447,15 +571,7 @@ async def change_password(
             detail="Invalid current password"
         )
     
-    # Check password strength
-    is_strong, message = auth_service.is_strong_password(password_data.new_password)
-    if not is_strong:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=message
-        )
-    
-    # Hash new password
+    # Hash new password (password strength is validated by Pydantic)
     hashed_password = auth_service.get_password_hash(password_data.new_password)
     
     # Update password

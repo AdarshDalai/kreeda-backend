@@ -57,6 +57,21 @@ class UserCreate(UserBase):
             raise ValueError('Password is required for email authentication')
         if v and len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
+        if v:
+            # Basic strength validation
+            has_upper = any(c.isupper() for c in v)
+            has_lower = any(c.islower() for c in v)
+            has_digit = any(c.isdigit() for c in v)
+            has_special = any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in v)
+            
+            if not has_upper:
+                raise ValueError('Password must contain at least one uppercase letter')
+            if not has_lower:
+                raise ValueError('Password must contain at least one lowercase letter')
+            if not has_digit:
+                raise ValueError('Password must contain at least one number')
+            if not has_special:
+                raise ValueError('Password must contain at least one special character')
         return v
 
 
@@ -154,6 +169,16 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     user: UserResponse
+    scope: Optional[str] = None  # OAuth2 scope
+
+
+class OAuth2TokenResponse(BaseModel):
+    """OAuth2 compliant token response."""
+    access_token: str
+    token_type: str = "Bearer"
+    expires_in: int
+    refresh_token: Optional[str] = None
+    scope: Optional[str] = None
 
 
 class RefreshTokenRequest(BaseModel):
@@ -172,6 +197,20 @@ class PasswordResetConfirm(BaseModel):
     def validate_password(cls, v):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
+        
+        has_upper = any(c.isupper() for c in v)
+        has_lower = any(c.islower() for c in v)
+        has_digit = any(c.isdigit() for c in v)
+        has_special = any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in v)
+        
+        if not has_upper:
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not has_lower:
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not has_digit:
+            raise ValueError('Password must contain at least one number')
+        if not has_special:
+            raise ValueError('Password must contain at least one special character')
         return v
 
 
@@ -187,6 +226,20 @@ class ChangePasswordRequest(BaseModel):
     def validate_new_password(cls, v):
         if len(v) < 8:
             raise ValueError('New password must be at least 8 characters long')
+        
+        has_upper = any(c.isupper() for c in v)
+        has_lower = any(c.islower() for c in v)
+        has_digit = any(c.isdigit() for c in v)
+        has_special = any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in v)
+        
+        if not has_upper:
+            raise ValueError('New password must contain at least one uppercase letter')
+        if not has_lower:
+            raise ValueError('New password must contain at least one lowercase letter')
+        if not has_digit:
+            raise ValueError('New password must contain at least one number')
+        if not has_special:
+            raise ValueError('New password must contain at least one special character')
         return v
 
 
@@ -222,7 +275,57 @@ class UserSessionsResponse(BaseModel):
 
 
 class RevokeSessionRequest(BaseModel):
-    session_jti: str
+    session_id: str
+
+
+# OAuth2 specific schemas
+class OAuth2ClientRegistration(BaseModel):
+    """OAuth2 client registration request."""
+    client_name: str
+    redirect_uris: List[str]
+    grant_types: Optional[List[str]] = ["authorization_code", "refresh_token"]
+    response_types: Optional[List[str]] = ["code"]
+    scopes: Optional[List[str]] = ["read", "profile"]
+    application_type: Optional[str] = "web"
+    contacts: Optional[List[str]] = None
+
+
+class OAuth2ClientResponse(BaseModel):
+    """OAuth2 client registration response."""
+    client_id: str
+    client_secret: str
+    client_name: str
+    redirect_uris: List[str]
+    grant_types: List[str]
+    response_types: List[str]
+    scopes: List[str]
+    is_active: bool
+    created_at: datetime
+
+
+class OAuth2AuthorizeRequest(BaseModel):
+    """OAuth2 authorization request."""
+    response_type: str = "code"
+    client_id: str
+    redirect_uri: str
+    scope: Optional[str] = "read"
+    state: Optional[str] = None
+    code_challenge: Optional[str] = None
+    code_challenge_method: Optional[str] = "S256"
+
+
+class OAuth2TokenRequest(BaseModel):
+    """OAuth2 token request."""
+    grant_type: str
+    client_id: str
+    client_secret: str
+    code: Optional[str] = None
+    redirect_uri: Optional[str] = None
+    refresh_token: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    scope: Optional[str] = None
+    code_verifier: Optional[str] = None
 
 
 class AdminUserResponse(UserResponse):

@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -171,7 +171,7 @@ class AuthService:
             
         return f"{device_type} - {browser}"
 
-    def is_strong_password(self, password: str) -> tuple[bool, str]:
+    def is_strong_password(self, password: str) -> Tuple[bool, str]:
         """Check if password meets strength requirements."""
         if len(password) < 8:
             return False, "Password must be at least 8 characters long"
