@@ -5,7 +5,7 @@ Input validation, output serialization, and API documentation
 from typing import Optional, List, Literal
 from datetime import datetime
 from decimal import Decimal
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 # Base schemas
@@ -40,9 +40,6 @@ class TeamWithPlayers(TeamResponse):
 class PlayerCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
     jersey_number: Optional[int] = Field(None, ge=1, le=999)
-    position: Optional[str] = Field(None, max_length=50)
-    batting_style: Optional[str] = Field(None, max_length=50)
-    bowling_style: Optional[str] = Field(None, max_length=50)
 
 
 class PlayerUpdate(BaseModel):
@@ -71,9 +68,10 @@ class MatchCreate(BaseModel):
     venue: Optional[str] = Field(None, max_length=200)
     match_type: Optional[str] = Field("Limited Overs", max_length=50)
     
-    @validator('team_b_id')
-    def teams_must_be_different(cls, v, values):
-        if 'team_a_id' in values and v == values['team_a_id']:
+    @field_validator('team_b_id')
+    @classmethod
+    def teams_must_be_different(cls, v, info):
+        if info.data and 'team_a_id' in info.data and v == info.data['team_a_id']:
             raise ValueError('Teams must be different')
         return v
 
@@ -111,21 +109,22 @@ class BallCreate(BaseModel):
     extras: int = Field(0, ge=0, le=10, description="Extra runs (wides, byes, etc)")
     extra_type: Optional[Literal["wide", "noball", "bye", "legbye"]] = None
     
-    ball_type: Optional[str] = Field("normal", max_length=20)
     is_wicket: bool = Field(False, description="Was there a wicket?")
     wicket_type: Optional[Literal["bowled", "caught", "lbw", "run_out", "stumped", "hit_wicket"]] = None
     wicket_player_id: Optional[int] = Field(None, description="Player who got out")
     fielder_id: Optional[int] = Field(None, description="Fielder involved")
     
-    @validator('wicket_type')
-    def wicket_type_required_if_wicket(cls, v, values):
-        if values.get('is_wicket') and not v:
+    @field_validator('wicket_type')
+    @classmethod
+    def wicket_type_required_if_wicket(cls, v, info):
+        if info.data and info.data.get('is_wicket') and not v:
             raise ValueError('Wicket type required when is_wicket is True')
         return v
     
-    @validator('extra_type')
-    def validate_extras(cls, v, values):
-        if values.get('extras', 0) > 0 and not v:
+    @field_validator('extra_type')
+    @classmethod
+    def validate_extras(cls, v, info):
+        if info.data and info.data.get('extras', 0) > 0 and not v:
             raise ValueError('Extra type required when extras > 0')
         return v
 

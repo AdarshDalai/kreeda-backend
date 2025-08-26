@@ -1,13 +1,17 @@
 """
 Cricket API Routes - Fast and focused on MVP functionality
 Team management, match creation, and live scoring endpoints
+Now with proper authentication!
 """
-from typing import List
+from typing import List, Annotated
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 
 from app.core.database import get_db
-from app.models.cricket import Team, Player, Match, Innings
+from app.core.auth import get_current_active_user
+from app.models.cricket import Team, Player, Match, Innings, User, Ball
 from app.schemas.cricket import (
     TeamCreate, TeamResponse, TeamWithPlayers,
     PlayerCreate, PlayerResponse, PlayerUpdate,
@@ -28,14 +32,14 @@ router = APIRouter(prefix="/api/cricket", tags=["cricket"])
 @router.post("/teams", response_model=TeamResponse)
 def create_team(
     team_data: TeamCreate,
-    db: Session = Depends(get_db),
-    # current_user: User = Depends(get_current_user)  # Add auth later
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    db: Session = Depends(get_db)
 ):
     """Create a new cricket team"""
     team = Team(
         name=team_data.name,
         short_name=team_data.short_name,
-        created_by=1  # Hardcode for MVP, add auth later
+        created_by=current_user.id  # Now using authenticated user
     )
     db.add(team)
     db.commit()
@@ -74,7 +78,8 @@ def add_player(
     
     player = Player(
         team_id=team_id,
-        **player_data.dict(exclude={'team_id'})
+        name=player_data.name,
+        jersey_number=player_data.jersey_number
     )
     db.add(player)
     db.commit()
@@ -118,7 +123,13 @@ def create_match(
     if match_data.team_a_id == match_data.team_b_id:
         raise HTTPException(status_code=400, detail="Teams cannot play against themselves")
     
-    match = Match(**match_data.dict())
+    # Create match with only the fields that exist in the model
+    match = Match(
+        team_a_id=match_data.team_a_id,
+        team_b_id=match_data.team_b_id,
+        overs_per_side=match_data.overs_per_side,
+        venue=match_data.venue
+    )
     db.add(match)
     db.commit()
     db.refresh(match)
@@ -240,11 +251,73 @@ def get_live_score(match_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/matches/{match_id}/last-ball")
-def undo_last_ball(match_id: int, db: Session = Depends(get_db)):
+def undo_last_ball(
+    match_id: int, 
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    db: Session = Depends(get_db)
+):
     """Undo last ball - Essential for fixing mistakes"""
-    # TODO: Implement undo functionality
-    # This is critical for real matches where mistakes happen
-    raise HTTPException(status_code=501, detail="Undo functionality coming soon")
+    match = db.query(Match).filter(Match.id == match_id).first()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    
+    # Get current innings
+    current_innings = (db.query(Innings)
+                      .filter(Innings.match_id == match_id, 
+                             Innings.innings_number == match.current_innings)
+                      .first())
+    
+    if not current_innings:
+        raise HTTPException(status_code=400, detail="No active innings found")
+    
+    # Get last ball
+    last_ball = (db.query(Ball)
+                .filter(Ball.innings_id == current_innings.id)
+                .order_by(desc(Ball.id))
+                .first())
+    
+    if not last_ball:
+        raise HTTPException(status_code=400, detail="No balls to undo")
+    
+    # Store ball data for response
+    ball_data = {
+        "id": last_ball.id,
+        "over_number": last_ball.over_number,
+        "ball_number": last_ball.ball_number,
+        "runs": last_ball.runs,
+        "extras": last_ball.extras,
+        "is_wicket": last_ball.is_wicket
+    }
+    
+    # Update innings statistics (reverse the ball)
+    current_innings.total_runs -= (last_ball.runs + last_ball.extras)
+    current_innings.extras -= last_ball.extras
+    
+    if last_ball.is_wicket:
+        current_innings.wickets_lost -= 1
+    
+    if last_ball.is_valid_ball:
+        # Recalculate overs completed
+        total_balls = (db.query(Ball)
+                      .filter(Ball.innings_id == current_innings.id, 
+                             Ball.is_valid_ball == True,
+                             Ball.id != last_ball.id)
+                      .count())
+        current_innings.overs_completed = Decimal(total_balls // 6) + Decimal((total_balls % 6) / 10)
+    
+    # Delete the ball
+    db.delete(last_ball)
+    db.commit()
+    
+    return {
+        "message": "Last ball undone successfully",
+        "undone_ball": ball_data,
+        "innings_stats": {
+            "total_runs": current_innings.total_runs,
+            "wickets_lost": current_innings.wickets_lost,
+            "overs_completed": str(current_innings.overs_completed)
+        }
+    }
 
 
 # Quick health check

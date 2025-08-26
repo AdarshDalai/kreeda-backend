@@ -6,7 +6,7 @@ Built for speed and accuracy - 3 second rule compliance!
 from typing import Optional, Tuple, Dict, Any
 from decimal import Decimal
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, desc
+from sqlalchemy import and_, desc, func
 
 from app.models.cricket import Match, Innings, Ball, Player
 from app.schemas.cricket import BallCreate, LiveScore, BatsmanStats, BowlerStats, InningsStats
@@ -246,10 +246,56 @@ class CricketScoringService:
         )
     
     def _get_current_batsmen_stats(self, innings_id: int) -> list[BatsmanStats]:
-        """Get current batsmen statistics - optimized query"""
-        # This would need complex SQL - simplified for MVP
-        # In production, you'd want cached statistics
-        return []  # Placeholder - implement based on last ball records
+        """Get current batsmen statistics - get the two batsmen from latest ball"""
+        # Get the latest ball to find current batsmen
+        latest_ball = (self.db.query(Ball)
+                      .filter(Ball.innings_id == innings_id)
+                      .order_by(desc(Ball.id))
+                      .first())
+        
+        if not latest_ball:
+            return []
+        
+        # Get stats for both batsmen
+        batsmen_ids = [latest_ball.batsman_id, latest_ball.non_striker_id]
+        batsmen_stats = []
+        
+        for batsman_id in batsmen_ids:
+            if not batsman_id:  # Check for None
+                continue
+                
+            # Query batsman stats for this innings
+            stats_query = (self.db.query(
+                func.sum(Ball.runs).label('runs'),
+                func.count(Ball.id).filter(Ball.is_valid_ball == True).label('balls_faced'),
+                func.count(Ball.id).filter(Ball.runs == 4).label('fours'),
+                func.count(Ball.id).filter(Ball.runs == 6).label('sixes')
+            ).filter(
+                Ball.innings_id == innings_id,
+                Ball.batsman_id == batsman_id
+            ).first())
+            
+            # Get player name
+            player = self.db.query(Player).filter(Player.id == batsman_id).first()
+            
+            if not stats_query:
+                continue
+                
+            runs = stats_query.runs or 0
+            balls_faced = stats_query.balls_faced or 0
+            strike_rate = (runs / balls_faced * 100) if balls_faced > 0 else 0.0
+            
+            batsmen_stats.append(BatsmanStats(
+                player_id=int(batsman_id),
+                name=str(player.name) if player else "Unknown",
+                runs=int(runs),
+                balls_faced=int(balls_faced),
+                fours=int(stats_query.fours or 0),
+                sixes=int(stats_query.sixes or 0),
+                strike_rate=round(strike_rate, 2)
+            ))
+        
+        return batsmen_stats
     
     def _get_current_bowler_stats(self, innings_id: int) -> BowlerStats:
         """Get current bowler statistics"""
@@ -265,8 +311,22 @@ class CricketScoringService:
     
     def _get_recent_balls(self, innings_id: int, limit: int = 6) -> list:
         """Get recent balls for live updates"""
-        return (self.db.query(Ball)
+        balls = (self.db.query(Ball)
                 .filter(Ball.innings_id == innings_id)
                 .order_by(desc(Ball.id))
                 .limit(limit)
                 .all())
+        
+        # Convert Ball objects to dictionaries for JSON serialization
+        return [{
+            "id": ball.id,
+            "over_number": ball.over_number,
+            "ball_number": ball.ball_number,
+            "runs": ball.runs,
+            "extras": ball.extras,
+            "extra_type": ball.extra_type,
+            "is_wicket": ball.is_wicket,
+            "wicket_type": ball.wicket_type,
+            "batsman_id": ball.batsman_id,
+            "bowler_id": ball.bowler_id
+        } for ball in balls]

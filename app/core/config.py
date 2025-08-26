@@ -6,7 +6,7 @@ import os
 import secrets
 from typing import List, Any
 from pydantic_settings import BaseSettings
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 
 
 class Settings(BaseSettings):
@@ -23,6 +23,8 @@ class Settings(BaseSettings):
         default="postgresql://kreeda_user:kreeda_pass@localhost:5432/kreeda_db",
         description="PostgreSQL database URL"
     )
+    DB_POOL_SIZE: int = Field(default=10, description="Database connection pool size")
+    DB_MAX_OVERFLOW: int = Field(default=20, description="Database connection pool overflow")
     
     # Redis
     REDIS_URL: str = Field(
@@ -60,20 +62,23 @@ class Settings(BaseSettings):
     MAX_OVERS_PER_INNINGS: int = Field(default=50, ge=1, le=50)
     MAX_RUNS_PER_BALL: int = Field(default=6, ge=0, le=6)
     
-    @validator('SECRET_KEY')
+    @field_validator('SECRET_KEY')
+    @classmethod
     def validate_secret_key(cls, v):
         if v == "your-secret-key-change-this-in-production":
             if os.getenv("ENVIRONMENT", "development") == "production":
                 raise ValueError("Must set a proper SECRET_KEY in production")
         return v
     
-    @validator('DATABASE_URL')
+    @field_validator('DATABASE_URL')
+    @classmethod
     def validate_database_url(cls, v):
         if not v.startswith(('postgresql://', 'postgresql+psycopg2://')):
             raise ValueError("DATABASE_URL must be a PostgreSQL connection string")
         return v
     
-    @validator('BACKEND_CORS_ORIGINS', pre=True)
+    @field_validator('BACKEND_CORS_ORIGINS', mode='before')
+    @classmethod
     def assemble_cors_origins(cls, v: Any) -> List[str]:
         if isinstance(v, str) and not v.startswith('['):
             return [i.strip() for i in v.split(',')]

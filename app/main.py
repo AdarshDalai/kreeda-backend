@@ -15,6 +15,7 @@ from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.middleware import SecurityHeadersMiddleware, RequestLoggingMiddleware, RateLimitMiddleware
 from app.api.cricket import router as cricket_router
+from app.api.auth import router as auth_router
 
 # Setup logging
 logger = setup_logging()
@@ -52,6 +53,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth_router)
 app.include_router(cricket_router)
 
 
