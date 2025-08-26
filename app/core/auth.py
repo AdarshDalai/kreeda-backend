@@ -86,7 +86,7 @@ def get_current_user(
 
 def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
     """Get current active user (not disabled)"""
-    if not current_user.is_active:
+    if not getattr(current_user, "is_active", False):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inactive user"

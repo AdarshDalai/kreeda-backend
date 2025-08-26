@@ -224,7 +224,7 @@ def record_ball(
     if not current_innings:
         raise HTTPException(status_code=400, detail="No active innings found")
     
-    if current_innings.is_completed:
+    if getattr(current_innings, "is_completed", False):
         raise HTTPException(status_code=400, detail="Innings already completed")
     
     # Use scoring service
