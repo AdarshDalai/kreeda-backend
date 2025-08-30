@@ -18,11 +18,12 @@ class UserLogin(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: int
+    id: str  # Changed from int to str to support UUID
     username: str
     email: str
     full_name: Optional[str]
-    is_active: bool
+    is_active: bool = True  # Default value
+    created_at: str  # Add created_at field
     
     class Config:
         from_attributes = True

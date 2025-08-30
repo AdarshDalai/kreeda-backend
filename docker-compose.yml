@@ -1,14 +1,16 @@
 services:
-  # Database Migration Service
-  migrate:
-    build: .
-    environment:
-      - DATABASE_URL=postgresql://kreeda_user:kreeda_pass@postgres:5432/kreeda_db
-    depends_on:
-      postgres:
-        condition: service_healthy
-    command: sh -c "alembic upgrade head"
-    restart: "no"
+  # DynamoDB Local for local development
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    ports:
+      - "8001:8000"
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:8000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   # Kreeda Backend API
   api:
@@ -16,16 +18,20 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://kreeda_user:kreeda_pass@postgres:5432/kreeda_db
-      - REDIS_URL=redis://redis:6379
+      - DYNAMODB_ENDPOINT_URL=http://dynamodb-local:8000
+      - DYNAMODB_TABLE=kreeda-cricket-data
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy
+      - AWS_REGION=us-east-1
       - DEBUG=true
+      - ENVIRONMENT=development
+      - SECRET_KEY=your-development-secret-key-change-in-production
+      - USE_COGNITO=false
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
     depends_on:
-      migrate:
-        condition: service_completed_successfully
-      postgres:
+      dynamodb-local:
         condition: service_healthy
-      redis:
-        condition: service_started
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -33,24 +39,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15
-    environment:
-      - POSTGRES_USER=kreeda_user
-      - POSTGRES_PASSWORD=kreeda_pass
-      - POSTGRES_DB=kreeda_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kreeda_user -d kreeda_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   # Redis for caching and WebSocket management
   redis:
@@ -60,17 +48,5 @@ services:
     volumes:
       - redis_data:/data
 
-  # pgAdmin for database management (optional)
-  pgadmin:
-    image: dpage/pgadmin4
-    environment:
-      - PGADMIN_DEFAULT_EMAIL=admin@kreeda.app
-      - PGADMIN_DEFAULT_PASSWORD=admin123
-    ports:
-      - "5050:80"
-    depends_on:
-      - postgres
-
 volumes:
-  postgres_data:
   redis_data:

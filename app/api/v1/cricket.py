@@ -1,6 +1,6 @@
 """
-Cricket API Routes - Complete DynamoDB Implementation
-All operations use DynamoDB single table design for optimal NoSQL performance
+Cricket API Routes - Version 1
+Complete DynamoDB Implementation with API versioning
 """
 from typing import List, Annotated
 from decimal import Decimal
@@ -22,7 +22,7 @@ from app.core.exceptions import (
 )
 from app.core.validation import validator
 
-router = APIRouter(tags=["cricket"])
+router = APIRouter(tags=["cricket-v1"])
 
 # Global DynamoDB service instance for all operations
 db_service = DynamoDBService()
@@ -34,25 +34,25 @@ def create_team(
     team_data: TeamCreate,
     current_user: Annotated[UserResponse, Depends(get_current_user)]
 ):
-    """Create a new cricket team with input validation"""
+    """Create a new cricket team with input validation - Version 1"""
     try:
         # Validate and sanitize input
         validated_name = validator.validate_team_name(team_data.name)
         validated_short_name = validator.validate_team_name(team_data.short_name)
-        
+
         # Validate optional fields
         validated_city = None
         if team_data.city:
             validated_city = validator.validate_team_name(team_data.city)
-            
+
         validated_coach = None
         if team_data.coach:
             validated_coach = validator.validate_name(team_data.coach)
-            
+
         validated_home_ground = None
         if team_data.home_ground:
             validated_home_ground = validator.validate_venue(team_data.home_ground)
-        
+
         team_dict = {
             "name": validated_name,
             "short_name": validated_short_name,
@@ -81,18 +81,18 @@ def create_team(
 
 @router.get("/teams/{team_id}", response_model=TeamWithPlayers)
 def get_team(team_id: str):
-    """Get team with players"""
+    """Get team with players - Version 1"""
     try:
         # Validate team_id format
         validator.validate_uuid(team_id, "Team ID")
-        
+
         team = db_service.get_team(team_id)
         if not team:
             raise HTTPException(status_code=404, detail="Team not found")
 
         # Get players for this team
         players_data = db_service.get_team_players(team_id)
-        
+
         # Convert to PlayerResponse objects
         players = []
         for player_data in players_data:
@@ -130,7 +130,7 @@ def list_teams(
     skip: int = 0,
     limit: int = 100
 ):
-    """List all teams for the current user"""
+    """List all teams for the current user - Version 1"""
     try:
         teams = db_service.get_user_teams(str(current_user.id))
         return teams
@@ -144,7 +144,7 @@ def list_teams(
 # Player Management
 @router.post("/teams/{team_id}/players", response_model=PlayerResponse)
 def add_player(team_id: str, player_data: PlayerCreate):
-    """Add player to team"""
+    """Add player to team - Version 1"""
     try:
         # Verify team exists
         team = db_service.get_team(team_id)
@@ -174,7 +174,7 @@ def add_player(team_id: str, player_data: PlayerCreate):
 
 @router.put("/players/{player_id}", response_model=PlayerResponse)
 def update_player(player_id: str, player_data: PlayerUpdate):
-    """Update player details"""
+    """Update player details - Version 1"""
     try:
         # Convert Pydantic model to dict, excluding None values
         update_data = player_data.model_dump(exclude_unset=True, exclude_none=True)
@@ -215,7 +215,7 @@ def update_player(player_id: str, player_data: PlayerUpdate):
 # Match Management
 @router.post("/matches", response_model=MatchResponse)
 def create_match(match_data: MatchCreate):
-    """Create a new cricket match"""
+    """Create a new cricket match - Version 1"""
     try:
         # Verify teams exist
         team_a = db_service.get_team(str(match_data.team_a_id))
@@ -256,19 +256,14 @@ def create_match(match_data: MatchCreate):
 
 @router.post("/matches/{match_id}/toss", response_model=MatchResponse)
 def set_toss_result(match_id: str, toss_data: TossResult):
-    """Set toss result and batting order"""
+    """Set toss result and batting order - Version 1"""
     try:
         match = db_service.get_match(match_id)
         if not match:
             raise HTTPException(status_code=404, detail="Match not found")
 
         # Update match with toss result
-        toss_dict = {
-            'toss_winner': toss_data.toss_winner_id,
-            'batting_first': toss_data.batting_first_id
-        }
-
-        updated_match = db_service.update_match_toss(match_id, toss_dict)
+        updated_match = db_service.update_match_toss(match_id, toss_data.dict())
 
         return MatchResponse(
             id=updated_match["id"],
@@ -286,10 +281,11 @@ def set_toss_result(match_id: str, toss_data: TossResult):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to set toss result: {str(e)}"
         )
-# Live Scoring and Match Operations (DynamoDB-based)
+
+
 @router.post("/matches/{match_id}/start", response_model=MatchResponse)
 def start_match(match_id: str):
-    """Start the match"""
+    """Start the match - Version 1"""
     try:
         match = db_service.get_match(match_id)
         if not match:
@@ -301,7 +297,7 @@ def start_match(match_id: str):
         # For MVP, we'll implement a simple start mechanism
         # Update match status to in_progress
         updated_match = db_service.update_match_status(match_id, 'in_progress')
-        
+
         return MatchResponse(
             id=updated_match["id"],
             team_a_id=updated_match["team_a_id"],
@@ -324,7 +320,7 @@ def start_match(match_id: str):
 
 @router.get("/matches/{match_id}", response_model=MatchResponse)
 def get_match(match_id: str):
-    """Get match details"""
+    """Get match details - Version 1"""
     try:
         match = db_service.get_match(match_id)
         if not match:
@@ -354,7 +350,7 @@ def record_ball(
     match_id: str,
     ball_data: BallCreate
 ):
-    """Record a cricket ball - The heart of the app!"""
+    """Record a cricket ball - The heart of the app! - Version 1"""
     try:
         match = db_service.get_match(match_id)
         if not match:
@@ -365,7 +361,7 @@ def record_ball(
 
         # Record ball using DynamoDB service
         ball_response = db_service.record_ball(
-            match_id, 
+            match_id,
             1,  # innings_number - simplified for MVP
             ball_data.dict()
         )
@@ -385,7 +381,7 @@ def record_ball(
 
 @router.get("/matches/{match_id}/live", response_model=LiveScore)
 def get_live_score(match_id: str):
-    """Get live score - Must be fast for real-time updates!"""
+    """Get live score - Must be fast for real-time updates! - Version 1"""
     try:
         return db_service.get_live_score(match_id)
     except Exception as e:
@@ -397,10 +393,10 @@ def get_live_score(match_id: str):
 
 @router.delete("/matches/{match_id}/last-ball")
 def undo_last_ball(
-    match_id: str, 
+    match_id: str,
     current_user: Annotated[UserResponse, Depends(get_current_user)]
 ):
-    """Undo last ball - Essential for fixing mistakes"""
+    """Undo last ball - Essential for fixing mistakes - Version 1"""
     try:
         # Verify match exists and is in progress
         match = db_service.get_match(match_id)
@@ -431,5 +427,5 @@ def undo_last_ball(
 # Quick health check
 @router.get("/health")
 def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "service": "cricket-api"}
+    """Health check endpoint - Version 1"""
+    return {"status": "healthy", "service": "cricket-api", "version": "v1"}

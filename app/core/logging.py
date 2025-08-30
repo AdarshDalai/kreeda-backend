@@ -1,72 +1,135 @@
 """
-Structured logging configuration for Kreeda Backend
+Logging Configuration for Kreeda Backend
+Structured logging with proper formatting and levels
 """
-import logging
+import os
 import sys
-from typing import Any, Dict
+import logging
 import json
 from datetime import datetime
+from typing import Dict, Any, Optional
 
 from app.core.config import settings
 
 
-class StructuredFormatter(logging.Formatter):
+class JSONFormatter(logging.Formatter):
     """JSON formatter for structured logging"""
-    
+
     def format(self, record: logging.LogRecord) -> str:
         log_entry = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.utcnow().isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
         }
-        
-        # Add extra fields if present
-        if hasattr(record, "match_id"):
-            log_entry["match_id"] = getattr(record, "match_id")
-        if hasattr(record, "user_id"):
-            log_entry["user_id"] = getattr(record, "user_id")
-        if hasattr(record, "request_id"):
-            log_entry["request_id"] = getattr(record, "request_id")
-        
+
         # Add exception info if present
         if record.exc_info:
             log_entry["exception"] = self.formatException(record.exc_info)
-        
-        return json.dumps(log_entry)
+
+        # Add extra fields if present
+        extra_fields = getattr(record, 'extra_fields', None)
+        if extra_fields:
+            log_entry.update(extra_fields)
+
+        return json.dumps(log_entry, default=str)
 
 
-def setup_logging():
-    """Configure logging for the application"""
-    # Remove default handlers
-    logging.getLogger().handlers = []
-    
-    # Create console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    
-    if settings.DEBUG:
-        # Human-readable format for development
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+class TextFormatter(logging.Formatter):
+    """Text formatter for development"""
+
+    def __init__(self):
+        super().__init__(
+            fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
         )
-        console_handler.setFormatter(formatter)
-        log_level = logging.DEBUG
+
+
+def get_log_level() -> int:
+    """Get logging level from environment or settings"""
+    level_str = os.environ.get('LOG_LEVEL', settings.LOG_LEVEL).upper()
+    level_map = {
+        'DEBUG': logging.DEBUG,
+        'INFO': logging.INFO,
+        'WARNING': logging.WARNING,
+        'ERROR': logging.ERROR,
+        'CRITICAL': logging.CRITICAL
+    }
+    return level_map.get(level_str, logging.INFO)
+
+
+def get_formatter() -> logging.Formatter:
+    """Get appropriate formatter based on settings"""
+    format_type = os.environ.get('LOG_FORMAT', settings.LOG_FORMAT).lower()
+
+    if format_type == 'json':
+        return JSONFormatter()
     else:
-        # Structured logging for production
-        formatter = StructuredFormatter()
-        console_handler.setFormatter(formatter)
-        log_level = logging.INFO
-    
-    # Configure root logger
-    logging.getLogger().setLevel(log_level)
-    logging.getLogger().addHandler(console_handler)
-    
-    # Set specific loggers
-    logging.getLogger("uvicorn").setLevel(logging.INFO)
-    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING if not settings.DEBUG else logging.INFO)
-    
-    return logging.getLogger("kreeda")
+        return TextFormatter()
 
 
-# Create logger instance
+def setup_logging() -> logging.Logger:
+    """Setup logging configuration"""
+    # Get root logger
+    logger = logging.getLogger()
+    logger.setLevel(get_log_level())
+
+    # Remove existing handlers to avoid duplicates
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+
+    # Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(get_log_level())
+    console_handler.setFormatter(get_formatter())
+    logger.addHandler(console_handler)
+
+    # Create logger for this module
+    app_logger = logging.getLogger('kreeda_backend')
+    app_logger.setLevel(get_log_level())
+
+    return app_logger
+
+
+def get_request_logger() -> logging.Logger:
+    """Get logger for request logging"""
+    return logging.getLogger('kreeda_backend.requests')
+
+
+def log_request(logger: logging.Logger, request_id: str, method: str, path: str, status_code: int, duration: float):
+    """Log HTTP request details"""
+    extra_fields = {
+        'request_id': request_id,
+        'method': method,
+        'path': path,
+        'status_code': status_code,
+        'duration_ms': round(duration * 1000, 2)
+    }
+
+    if status_code >= 400:
+        logger.warning(f"Request failed: {method} {path}", extra={'extra_fields': extra_fields})
+    else:
+        logger.info(f"Request completed: {method} {path}", extra={'extra_fields': extra_fields})
+
+
+def log_error(logger: logging.Logger, error: Exception, request_id: Optional[str] = None, context: Optional[Dict[str, Any]] = None):
+    """Log error with context"""
+    extra_fields = {
+        'error_type': type(error).__name__,
+        'error_message': str(error),
+    }
+
+    if request_id:
+        extra_fields['request_id'] = request_id
+
+    if context:
+        extra_fields.update(context)
+
+    logger.error(f"Error occurred: {type(error).__name__}", extra={'extra_fields': extra_fields})
+
+
+# Global logger instance
 logger = setup_logging()
