@@ -5,7 +5,7 @@ Input validation, output serialization, and API documentation
 from typing import Optional, List, Literal
 from datetime import datetime
 from decimal import Decimal
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, validator
 
 
 # Base schemas
@@ -69,10 +69,10 @@ class MatchCreate(BaseModel):
     venue: Optional[str] = Field(None, max_length=200)
     match_type: Optional[str] = Field("Limited Overs", max_length=50)
     
-    @field_validator('team_b_id')
+    @validator('team_b_id')
     @classmethod
-    def teams_must_be_different(cls, v, info):
-        if info.data and 'team_a_id' in info.data and v == info.data['team_a_id']:
+    def teams_must_be_different(cls, v, values):
+        if 'team_a_id' in values and v == values['team_a_id']:
             raise ValueError('Teams must be different')
         return v
 
@@ -173,4 +173,4 @@ class LiveScore(BaseModel):
 
 
 # Update forward references
-TeamWithPlayers.model_rebuild()
+TeamWithPlayers.update_forward_refs()

@@ -12,9 +12,9 @@ Globals:
     Environment:
       Variables:
         DYNAMODB_TABLE: !Ref CricketDataTable
-        AWS_REGION: !Ref AWS::Region
         COGNITO_USER_POOL_ID: !Ref CognitoUserPool
         COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+        USE_COGNITO: "true"
 
 Resources:
   # DynamoDB Table for Cricket Data
@@ -45,7 +45,6 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
-          BillingMode: PAY_PER_REQUEST
       BillingMode: PAY_PER_REQUEST
       StreamSpecification:
         StreamViewType: NEW_AND_OLD_IMAGES
@@ -81,41 +80,15 @@ Resources:
       GenerateSecret: false
       ExplicitAuthFlows:
         - ADMIN_NO_SRP_AUTH
-        - USER_SRP_AUTH
+        - USER_PASSWORD_AUTH
       SupportedIdentityProviders:
         - COGNITO
-        - Google
-        - SignInWithApple
       CallbackURLs:
         - https://kreeda.cloudsbay.com/auth/callback
       LogoutURLs:
         - https://kreeda.cloudsbay.com/logout
 
-  # Google Identity Provider
-  GoogleIdentityProvider:
-    Type: AWS::Cognito::UserPoolIdentityProvider
-    Properties:
-      UserPoolId: !Ref CognitoUserPool
-      ProviderName: Google
-      ProviderType: Google
-      ProviderDetails:
-        client_id: ${GoogleClientId}
-        client_secret: ${GoogleClientSecret}
-        authorize_scopes: email profile openid
 
-  # Apple Identity Provider
-  AppleIdentityProvider:
-    Type: AWS::Cognito::UserPoolIdentityProvider
-    Properties:
-      UserPoolId: !Ref CognitoUserPool
-      ProviderName: SignInWithApple
-      ProviderType: SignInWithApple
-      ProviderDetails:
-        client_id: ${AppleClientId}
-        team_id: ${AppleTeamId}
-        key_id: ${AppleKeyId}
-        private_key: ${ApplePrivateKey}
-        authorize_scopes: email name
 
   # Lambda Function
   KreedaFunction:
@@ -124,6 +97,44 @@ Resources:
       FunctionName: kreeda-backend
       CodeUri: .
       Handler: lambda_handler.lambda_handler
+      Runtime: python3.11
+      MemorySize: 256
+      Timeout: 30
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref CricketDataTable
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+          USE_COGNITO: "true"
+          ENVIRONMENT: "production"
+          LOG_LEVEL: "INFO"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CricketDataTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:Scan
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:DescribeTable
+                - dynamodb:BatchGetItem
+                - dynamodb:BatchWriteItem
+              Resource:
+                - !GetAtt CricketDataTable.Arn
+                - !Sub "${CricketDataTable.Arn}/index/*"
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminCreateUser
+                - cognito-idp:AdminSetUserPassword
+                - cognito-idp:AdminInitiateAuth
+                - cognito-idp:ListUsers
+                - cognito-idp:AdminGetUser
+              Resource:
+                - !Sub "arn:aws:cognito-idp:${AWS::Region}:*:userpool/${CognitoUserPool}"
       Events:
         Api:
           Type: Api
@@ -131,18 +142,8 @@ Resources:
             Path: /{proxy+}
             Method: ANY
             RestApiId: !Ref KreedaApi
-      Layers:
-        - !Ref PythonRequirementsLayer
 
-  # Lambda Layer for Dependencies
-  PythonRequirementsLayer:
-    Type: AWS::Serverless::LayerVersion
-    Properties:
-      LayerName: kreeda-python-deps
-      ContentUri: .
-      CompatibleRuntimes:
-        - python3.11
-      RetentionPolicy: Retain
+
 
   # API Gateway
   KreedaApi:

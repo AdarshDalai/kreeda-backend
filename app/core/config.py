@@ -5,11 +5,10 @@ Built for speed, reliability, and cricket scoring accuracy
 import os
 import secrets
 from typing import List, Any, Optional
-from pydantic_settings import BaseSettings
-from pydantic import Field, field_validator
+from pydantic import BaseModel, Field, validator
 
 
-class Settings(BaseSettings):
+class Settings(BaseModel):
     """Application settings with proper validation and environment support"""
     
     # App Info
@@ -19,7 +18,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = Field(default="development", description="Environment: development, staging, production")
     
     # Database - DynamoDB Configuration (NoSQL)
-    DYNAMODB_ENDPOINT_URL: str = Field(
+    DYNAMODB_ENDPOINT_URL: Optional[str] = Field(
         default=None,
         description="DynamoDB endpoint URL for local development"
     )
@@ -33,11 +32,11 @@ class Settings(BaseSettings):
         default="us-east-1",
         description="AWS region for DynamoDB"
     )
-    AWS_ACCESS_KEY_ID: str = Field(
+    AWS_ACCESS_KEY_ID: Optional[str] = Field(
         default=None,
         description="AWS Access Key ID"
     )
-    AWS_SECRET_ACCESS_KEY: str = Field(
+    AWS_SECRET_ACCESS_KEY: Optional[str] = Field(
         default=None,
         description="AWS Secret Access Key"
     )
@@ -84,7 +83,7 @@ class Settings(BaseSettings):
     MAX_OVERS_PER_INNINGS: int = Field(default=50, ge=1, le=50)
     MAX_RUNS_PER_BALL: int = Field(default=6, ge=0, le=6)
     
-    @field_validator('SECRET_KEY')
+    @validator('SECRET_KEY')
     @classmethod
     def validate_secret_key(cls, v):
         if v == "your-secret-key-change-this-in-production":
@@ -98,7 +97,7 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = Field(default="json", description="Log format: json or text")
     
     # CORS - Environment-specific configuration
-    @field_validator('BACKEND_CORS_ORIGINS', mode='before')
+    @validator('BACKEND_CORS_ORIGINS', pre=True)
     @classmethod
     def assemble_cors_origins(cls, v: Any) -> List[str]:
         if isinstance(v, str) and not v.startswith('['):
@@ -136,7 +135,14 @@ class Settings(BaseSettings):
 
 def get_settings() -> Settings:
     """Get application settings - properly testable"""
-    return Settings()
+    # Load from environment variables
+    env_data = {}
+    for field_name in Settings.__fields__:
+        env_value = os.getenv(field_name)
+        if env_value is not None:
+            env_data[field_name] = env_value
+    
+    return Settings(**env_data)
 
 
 # Global settings instance - but now it's a function call for testability

@@ -53,7 +53,7 @@ if not settings.DEBUG:
 # Security Middleware
 app.add_middleware(
     TrustedHostMiddleware, 
-    allowed_hosts=["localhost", "127.0.0.1", "testserver", "*.kreeda.app"]
+    allowed_hosts=["localhost", "127.0.0.1", "testserver", "*.kreeda.app", "*.execute-api.us-east-1.amazonaws.com", "d2onhjy3j8yrox.cloudfront.net"]
 )
 
 # CORS Middleware - Security hardened

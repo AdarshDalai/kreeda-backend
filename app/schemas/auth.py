@@ -1,7 +1,7 @@
 """
 Authentication schemas for user registration, login, and token responses
 """
-from typing import Optional
+from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field, EmailStr
 
 
@@ -37,3 +37,36 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=6, max_length=100)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=6, max_length=100)
+
+
+class UpdateProfileRequest(BaseModel):
+    full_name: Optional[str] = Field(None, max_length=100)
+    email: Optional[EmailStr] = None
+
+
+class VerifyEmailRequest(BaseModel):
+    verification_code: str
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+class AuthResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[Dict[str, Any]] = None

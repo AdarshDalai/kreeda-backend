@@ -185,6 +185,94 @@ class DynamoDBService:
         )
         return response.get('Item')
 
+    # Cognito Sub-based User Profile Methods
+    @dynamodb_error_handler()
+    def create_user_profile(self, profile_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create user profile using Cognito sub as primary key"""
+        cognito_sub = profile_data['cognito_sub']
+        user_id = str(uuid.uuid4())
+
+        item = {
+            'PK': f'USERPROFILE#{cognito_sub}',
+            'SK': f'USERPROFILE#{cognito_sub}',
+            'GSI1PK': 'USERPROFILE',
+            'GSI1SK': f'USERPROFILE#{cognito_sub}',
+            'id': user_id,
+            'cognito_sub': cognito_sub,
+            'username': profile_data.get('username'),
+            'email': profile_data.get('email'),
+            'full_name': profile_data.get('full_name'),
+            'created_at': profile_data.get('created_at'),
+            'updated_at': profile_data.get('updated_at'),
+            'is_active': profile_data.get('is_active', True),
+            'profile_data': profile_data.get('profile_data', {}),
+            'entity_type': 'USERPROFILE'
+        }
+
+        self.table.put_item(Item=item)
+        return item
+
+    @dynamodb_error_handler()
+    def get_user_profile_by_cognito_sub(self, cognito_sub: str) -> Optional[Dict[str, Any]]:
+        """Get user profile by Cognito sub"""
+        response = self.table.get_item(
+            Key={
+                'PK': f'USERPROFILE#{cognito_sub}',
+                'SK': f'USERPROFILE#{cognito_sub}'
+            }
+        )
+        return response.get('Item')
+
+    @dynamodb_error_handler()
+    def update_user_profile(self, cognito_sub: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+        """Update user profile by Cognito sub"""
+        # First get the current profile
+        current_profile = self.get_user_profile_by_cognito_sub(cognito_sub)
+        if not current_profile:
+            raise ValueError(f"User profile not found for Cognito sub: {cognito_sub}")
+
+        # Update the profile data
+        update_expression = "SET "
+        expression_attribute_values = {}
+        expression_attribute_names = {}
+
+        for key, value in updates.items():
+            if key in ['username', 'email', 'full_name', 'profile_data', 'is_active', 'updated_at']:
+                update_expression += f"#{key} = :{key}, "
+                expression_attribute_values[f":{key}"] = value
+                expression_attribute_names[f"#{key}"] = key
+
+        # Remove trailing comma and space
+        update_expression = update_expression.rstrip(', ')
+
+        # Update the item
+        response = self.table.update_item(
+            Key={
+                'PK': f'USERPROFILE#{cognito_sub}',
+                'SK': f'USERPROFILE#{cognito_sub}'
+            },
+            UpdateExpression=update_expression,
+            ExpressionAttributeValues=expression_attribute_values,
+            ExpressionAttributeNames=expression_attribute_names,
+            ReturnValues='ALL_NEW'
+        )
+
+        return response.get('Attributes', {})
+
+    @dynamodb_error_handler()
+    def delete_user_profile(self, cognito_sub: str) -> bool:
+        """Delete user profile by Cognito sub"""
+        try:
+            self.table.delete_item(
+                Key={
+                    'PK': f'USERPROFILE#{cognito_sub}',
+                    'SK': f'USERPROFILE#{cognito_sub}'
+                }
+            )
+            return True
+        except Exception:
+            return False
+
     # Team Management
     @dynamodb_error_handler()
     def create_team(self, team_data: Dict[str, Any], created_by: str) -> Dict[str, Any]:

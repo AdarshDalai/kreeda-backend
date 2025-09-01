@@ -5,8 +5,8 @@ Google, Apple, and Cognito authentication endpoints
 import os
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import Dict, Any
-from pydantic import BaseModel
+from typing import Dict, Any, Optional
+from pydantic import BaseModel, EmailStr
 
 from app.core.cognito_auth import CognitoOAuth2Service, get_current_user_from_oauth
 
@@ -24,8 +24,22 @@ class CognitoAuthRequest(BaseModel):
     username: str
     password: str
 
+class CognitoRegisterRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+    full_name: Optional[str] = None
+
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    confirmation_code: str
+    new_password: str
 
 # Global OAuth2 service instance
 oauth_service = CognitoOAuth2Service()
@@ -56,6 +70,72 @@ async def authenticate_cognito(auth_request: CognitoAuthRequest):
         auth_request.username,
         auth_request.password
     )
+
+
+@router.post("/register", response_model=Dict[str, Any])
+async def register_cognito(auth_request: CognitoRegisterRequest):
+    """
+    Register a new user with Cognito
+    """
+    try:
+        # Create user in Cognito
+        response = oauth_service.client.admin_create_user(
+            UserPoolId=oauth_service.user_pool_id,
+            Username=auth_request.email,
+            UserAttributes=[
+                {
+                    'Name': 'email',
+                    'Value': auth_request.email
+                },
+                {
+                    'Name': 'email_verified',
+                    'Value': 'true'
+                },
+                {
+                    'Name': 'preferred_username',
+                    'Value': auth_request.username
+                }
+            ] + (
+                [{'Name': 'name', 'Value': auth_request.full_name}]
+                if auth_request.full_name else []
+            ),
+            MessageAction='SUPPRESS',
+            TemporaryPassword=auth_request.password
+        )
+
+        # Set permanent password
+        oauth_service.client.admin_set_user_password(
+            UserPoolId=oauth_service.user_pool_id,
+            Username=auth_request.email,
+            Password=auth_request.password,
+            Permanent=True
+        )
+
+        # Create user profile in DynamoDB
+        from app.services.dynamodb_cricket_scoring import DynamoDBService
+        from app.schemas.auth import UserCreate
+
+        db_service = DynamoDBService()
+        user_data = UserCreate(
+            username=auth_request.username,
+            email=auth_request.email,
+            password=auth_request.password,  # This will be hashed by create_user
+            full_name=auth_request.full_name
+        )
+        db_service.create_user(user_data)
+
+        return {
+            'message': 'User registered successfully',
+            'user_id': response['User']['Username'],
+            'email': auth_request.email,
+            'username': auth_request.username
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Registration failed: {str(e)}"
+        )
 
 @router.post("/refresh", response_model=Dict[str, Any])
 async def refresh_access_token(refresh_request: RefreshTokenRequest):
@@ -89,7 +169,49 @@ async def logout_user(
         "user_id": current_user["user_id"]
     }
 
-# OAuth2 configuration endpoints for mobile apps
+
+@router.post("/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest):
+    """
+    Send password reset email for Cognito users
+    """
+    try:
+        oauth_service.client.forgot_password(
+            ClientId=oauth_service.client_id,
+            Username=request.email
+        )
+        return {
+            "message": "Password reset email sent successfully",
+            "email": request.email
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Forgot password failed: {str(e)}"
+        )
+
+
+@router.post("/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    """
+    Reset password using confirmation code
+    """
+    try:
+        oauth_service.client.confirm_forgot_password(
+            ClientId=oauth_service.client_id,
+            Username=request.email,
+            ConfirmationCode=request.confirmation_code,
+            Password=request.new_password
+        )
+        return {
+            "message": "Password reset successfully"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Reset password failed: {str(e)}"
+        )
+
 @router.get("/config")
 async def get_oauth_config():
     """
@@ -109,5 +231,16 @@ async def get_oauth_config():
             "client_id": os.environ.get('APPLE_CLIENT_ID'),
             "redirect_uri": os.environ.get('APPLE_REDIRECT_URI'),
             "team_id": os.environ.get('APPLE_TEAM_ID')
+        },
+        "endpoints": {
+            "register": "/api/auth/oauth/register",
+            "login": "/api/auth/oauth/cognito",
+            "google_auth": "/api/auth/oauth/google",
+            "apple_auth": "/api/auth/oauth/apple",
+            "refresh": "/api/auth/oauth/refresh",
+            "me": "/api/auth/oauth/me",
+            "logout": "/api/auth/oauth/logout",
+            "forgot_password": "/api/auth/oauth/forgot-password",
+            "reset_password": "/api/auth/oauth/reset-password"
         }
     }
