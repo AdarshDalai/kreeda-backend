@@ -1,16 +1,39 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import List
+from typing import List, Optional
 import logging
 import uuid
+from pydantic import BaseModel, ConfigDict
+from datetime import datetime
 
 from app.utils.database import get_db
 from app.models.user import User
 from app.models.cricket import CricketMatch, CricketBall
-from app.schemas.cricket import CricketMatchCreate, CricketMatchResponse, BallRecord, BallResponse
+from app.schemas.cricket import CricketMatchCreate, BallRecord, BallResponse
 from app.auth.middleware import get_current_active_user
 from app.services.cricket_service import CricketService
+
+# Simple response schema without relationships to avoid async issues
+class MatchSimpleResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: uuid.UUID
+    team_a_id: uuid.UUID
+    team_b_id: uuid.UUID
+    overs_per_innings: int
+    venue: str
+    match_date: datetime
+    created_by_id: uuid.UUID
+    status: str
+    current_innings: int
+    team_a_score: int
+    team_a_wickets: int
+    team_a_overs: float
+    team_b_score: int
+    team_b_wickets: int
+    team_b_overs: float
+    created_at: datetime
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -21,7 +44,7 @@ async def cricket_health():
     return {"success": True, "message": "Cricket service healthy"}
 
 
-@router.post("/matches", response_model=CricketMatchResponse)
+@router.post("/", response_model=MatchSimpleResponse)
 async def create_match(
     match_data: CricketMatchCreate,
     db: AsyncSession = Depends(get_db),
@@ -55,7 +78,7 @@ async def create_match(
         )
 
 
-@router.get("/matches", response_model=List[CricketMatchResponse])
+@router.get("/", response_model=List[MatchSimpleResponse])
 async def get_matches(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -77,7 +100,7 @@ async def get_matches(
         )
 
 
-@router.get("/matches/{match_id}", response_model=CricketMatchResponse)
+@router.get("/{match_id}", response_model=MatchSimpleResponse)
 async def get_match(
     match_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -108,7 +131,7 @@ async def get_match(
         )
 
 
-@router.post("/matches/{match_id}/balls", response_model=BallResponse)
+@router.post("/{match_id}/balls", response_model=BallResponse)
 async def record_ball(
     match_id: uuid.UUID,
     ball_data: BallRecord,
@@ -145,7 +168,7 @@ async def record_ball(
         )
 
 
-@router.get("/matches/{match_id}/scorecard")
+@router.get("/{match_id}/scorecard")
 async def get_scorecard(
     match_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
