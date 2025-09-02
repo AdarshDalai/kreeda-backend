@@ -4,4 +4,5 @@ router = APIRouter()
 
 @router.get("/health")
 async def auth_health():
-    return {"success": True, "message": "Auth service healthy"}
+    return {"message": "Auth service is healthy"}
+
