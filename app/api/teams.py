@@ -1,14 +1,29 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
-from typing import List
+from typing import List, Optional
 import logging
 import uuid
+from pydantic import BaseModel, ConfigDict
+from datetime import datetime
 
 from app.utils.database import get_db
 from app.models.user import User, Team, TeamMember
-from app.schemas.team import TeamCreate, TeamResponse, TeamMemberResponse
+from app.schemas.team import TeamCreate, TeamMemberResponse
 from app.auth.middleware import get_current_active_user
+
+# Simple response schema without relationships to avoid async issues
+class TeamSimpleResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: uuid.UUID
+    name: str
+    short_name: str
+    logo_url: Optional[str] = None
+    created_by_id: uuid.UUID
+    captain_id: uuid.UUID
+    created_at: datetime
+    is_active: bool
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +35,7 @@ async def teams_health():
     return {"success": True, "message": "Teams service healthy"}
 
 
-@router.post("/", response_model=TeamResponse)
+@router.post("/", response_model=TeamSimpleResponse)
 async def create_team(
     team_data: TeamCreate,
     db: AsyncSession = Depends(get_db),
@@ -64,7 +79,7 @@ async def create_team(
         )
 
 
-@router.get("/", response_model=List[TeamResponse])
+@router.get("/", response_model=List[TeamSimpleResponse])
 async def get_user_teams(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -90,7 +105,7 @@ async def get_user_teams(
         )
 
 
-@router.get("/{team_id}", response_model=TeamResponse)
+@router.get("/{team_id}", response_model=TeamSimpleResponse)
 async def get_team(
     team_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
