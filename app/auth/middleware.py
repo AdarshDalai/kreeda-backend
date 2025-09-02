@@ -1,0 +1,123 @@
+from fastapi import HTTPException, Depends, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from jose import JWTError, jwt
+from datetime import datetime, timedelta
+import logging
+
+from app.config import settings
+from app.utils.database import get_db
+from app.models.user import User
+from app.auth.supabase import verify_supabase_token
+
+logger = logging.getLogger(__name__)
+
+# Security
+security = HTTPBearer()
+
+# JWT Functions
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    """Create JWT access token"""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=settings.jwt_access_token_expire_minutes)
+    
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return encoded_jwt
+
+
+def verify_token(token: str):
+    """Verify JWT token"""
+    try:
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return {"user_id": user_id}
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    """Get current authenticated user"""
+    token = credentials.credentials
+    
+    try:
+        # First try to verify as our JWT token
+        try:
+            payload = verify_token(token)
+            user_id = payload.get("user_id")
+        except HTTPException:
+            # If JWT verification fails, try Supabase token
+            try:
+                supabase_data = verify_supabase_token(token)
+                supabase_id = supabase_data.get("user_id")
+                
+                # Find user by supabase_id
+                result = await db.execute(
+                    select(User).where(User.supabase_id == supabase_id)
+                )
+                user = result.scalar_one_or_none()
+                
+                if not user:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="User not found"
+                    )
+                
+                return user
+                
+            except Exception as e:
+                logger.error(f"Supabase token verification failed: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Could not validate credentials",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        
+        # Get user by our internal user_id
+        if user_id:
+            result = await db.execute(
+                select(User).where(User.id == user_id)
+            )
+            user = result.scalar_one_or_none()
+            
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User not found"
+                )
+            
+            return user
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Authentication error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
+    """Get current active user"""
+    if not current_user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    return current_user
