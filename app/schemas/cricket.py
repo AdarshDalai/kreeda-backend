@@ -55,6 +55,18 @@ class BallResponse(BallRecord):
     created_at: datetime
 
 
+class ScorerAssignment(BaseModel):
+    """Schema for assigning scorers to a match"""
+    team_a_scorer_id: uuid.UUID = Field(..., description="User ID for Team A scorer")
+    team_b_scorer_id: uuid.UUID = Field(..., description="User ID for Team B scorer")  
+    umpire_id: Optional[uuid.UUID] = Field(None, description="Optional umpire/referee user ID")
+    
+    id: uuid.UUID
+    match_id: uuid.UUID
+    innings: int
+    created_at: datetime
+
+
 class PlayerStats(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
@@ -140,3 +152,40 @@ class MatchSummary(BaseModel):
     
     winner_team_id: Optional[uuid.UUID] = None
     result_description: Optional[str] = None
+
+
+# Basic response schema for API endpoints without relationship loading
+class MatchResponseBasic(BaseModel):
+    """Basic match response without relationship data to prevent async loading issues"""
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: uuid.UUID
+    team_a_id: uuid.UUID
+    team_b_id: uuid.UUID
+    overs_per_innings: int
+    venue: str
+    match_date: datetime
+    created_by_id: uuid.UUID
+    status: str
+    current_innings: int
+    
+    # Live scoring data
+    team_a_score: int
+    team_a_wickets: int
+    team_a_overs: float
+    team_b_score: int
+    team_b_wickets: int
+    team_b_overs: float
+    
+    # Toss data
+    toss_winner_id: Optional[uuid.UUID] = None
+    toss_decision: Optional[str] = None
+    
+    # Result data
+    winner_team_id: Optional[uuid.UUID] = None
+    result_description: Optional[str] = None
+    
+    # Timestamps
+    created_at: datetime
+    updated_at: datetime
+    completed_at: Optional[datetime] = None

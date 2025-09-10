@@ -1,0 +1,616 @@
+{
+  "info": {
+    "name": "Kreeda API Collection - Complete Test Automation",
+    "description": "Kreeda - Digital Cricket Scorekeeping Platform API with comprehensive test automation for production validation",
+    "version": "2.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-refresh token if needed",
+          "const tokenExpiry = pm.environment.get('token_expiry');",
+          "const currentTime = Math.floor(Date.now() / 1000);",
+          "",
+          "if (tokenExpiry && currentTime >= tokenExpiry) {",
+          "    console.log('Token expired, please re-login');",
+          "    pm.environment.unset('access_token');",
+          "    pm.environment.unset('token_expiry');",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Checks",
+      "item": [
+        {
+          "name": "Global Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Auth Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Teams Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", "health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cricket Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", "health"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set('access_token', response.access_token);",
+                  "    pm.environment.set('token_type', response.token_type);",
+                  "    ",
+                  "    // Calculate expiry time",
+                  "    const currentTime = Math.floor(Date.now() / 1000);",
+                  "    const expiryTime = currentTime + response.expires_in;",
+                  "    pm.environment.set('token_expiry', expiryTime);",
+                  "    ",
+                  "    console.log('User registered and token saved');",
+                  "} else {",
+                  "    console.log('Registration failed:', pm.response.text());",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"{{test_email}}\",\n    \"username\": \"{{test_username}}\",\n    \"full_name\": \"{{test_full_name}}\",\n    \"password\": \"{{test_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set('access_token', response.access_token);",
+                  "    pm.environment.set('token_type', response.token_type);",
+                  "    ",
+                  "    // Calculate expiry time",
+                  "    const currentTime = Math.floor(Date.now() / 1000);",
+                  "    const expiryTime = currentTime + response.expires_in;",
+                  "    pm.environment.set('token_expiry', expiryTime);",
+                  "    ",
+                  "    console.log('User logged in and token saved');",
+                  "} else {",
+                  "    console.log('Login failed:', pm.response.text());",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"{{test_email}}\",\n    \"password\": \"{{test_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Clear tokens on logout",
+                  "pm.environment.unset('access_token');",
+                  "pm.environment.unset('token_type');",
+                  "pm.environment.unset('token_expiry');",
+                  "console.log('Tokens cleared');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "logout"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Teams Management",
+      "item": [
+        {
+          "name": "Get User Teams",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const teams = pm.response.json();",
+                  "    if (teams.length > 0) {",
+                  "        pm.environment.set('team_id', teams[0].id);",
+                  "        console.log('First team ID saved:', teams[0].id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Team",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const team = pm.response.json();",
+                  "    pm.environment.set('team_id', team.id);",
+                  "    pm.environment.set('captain_id', team.captain_id);",
+                  "    console.log('Team created and ID saved:', team.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"{{team_name}}\",\n    \"short_name\": \"{{team_short_name}}\",\n    \"logo_url\": \"{{team_logo_url}}\",\n    \"captain_id\": \"{{captain_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Team by ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/{{team_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", "{{team_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Team",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/{{team_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", "{{team_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Team Members",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/{{team_id}}/members",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", "{{team_id}}", "members"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Join Team",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/{{team_id}}/join",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", "{{team_id}}", "join"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cricket Matches",
+      "item": [
+        {
+          "name": "Get All Matches",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const matches = pm.response.json();",
+                  "    if (matches.length > 0) {",
+                  "        pm.environment.set('match_id', matches[0].id);",
+                  "        console.log('First match ID saved:', matches[0].id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/cricket",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", "cricket"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Cricket Match",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const match = pm.response.json();",
+                  "    pm.environment.set('match_id', match.id);",
+                  "    console.log('Match created and ID saved:', match.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"team_a_id\": \"{{team_a_id}}\",\n    \"team_b_id\": \"{{team_b_id}}\",\n    \"overs_per_innings\": {{overs_per_innings}},\n    \"venue\": \"{{venue}}\",\n    \"match_date\": \"{{match_date}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/cricket",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", "cricket"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Match by ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/cricket/{{match_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", "cricket", "{{match_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Record Ball",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"over_number\": {{over_number}},\n    \"ball_number\": {{ball_number}},\n    \"bowler_id\": \"{{bowler_id}}\",\n    \"batsman_striker_id\": \"{{batsman_striker_id}}\",\n    \"batsman_non_striker_id\": \"{{batsman_non_striker_id}}\",\n    \"runs_scored\": {{runs_scored}},\n    \"extras\": {{extras}},\n    \"ball_type\": \"{{ball_type}}\",\n    \"is_wicket\": {{is_wicket}},\n    \"wicket_type\": \"{{wicket_type}}\",\n    \"dismissed_player_id\": \"{{dismissed_player_id}}\",\n    \"is_boundary\": {{is_boundary}},\n    \"boundary_type\": \"{{boundary_type}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/cricket/{{match_id}}/balls",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", "cricket", "{{match_id}}", "balls"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Match Scorecard",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/cricket/{{match_id}}/scorecard",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", "cricket", "{{match_id}}", "scorecard"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    }
+  ]
+}

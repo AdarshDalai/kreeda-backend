@@ -56,6 +56,50 @@ class CricketMatch(Base):
     winner_team = relationship("Team", foreign_keys=[winner_team_id])
     balls = relationship("CricketBall", back_populates="match")
     player_stats = relationship("MatchPlayerStats", back_populates="match")
+    
+    @property
+    def team_a_overs_display(self) -> str:
+        """Display overs in cricket format (e.g., 18.4)"""
+        if not self.team_a_overs:
+            return "0.0"
+        overs = int(self.team_a_overs)
+        balls = int((self.team_a_overs - overs) * 10)
+        return f"{overs}.{balls}"
+    
+    @property
+    def team_b_overs_display(self) -> str:
+        """Display overs in cricket format (e.g., 18.4)"""
+        if not self.team_b_overs:
+            return "0.0"
+        overs = int(self.team_b_overs)
+        balls = int((self.team_b_overs - overs) * 10)
+        return f"{overs}.{balls}"
+    
+    @property
+    def current_run_rate(self) -> float:
+        """Calculate current run rate for batting team"""
+        if self.current_innings == 1:
+            overs = self.team_a_overs or 0.1
+            return round(self.team_a_score / overs, 2) if overs > 0 else 0.0
+        else:
+            overs = self.team_b_overs or 0.1
+            return round(self.team_b_score / overs, 2) if overs > 0 else 0.0
+    
+    @property
+    def required_run_rate(self) -> float:
+        """Calculate required run rate for chasing team"""
+        if self.current_innings == 1:
+            return 0.0  # First innings
+        
+        target = self.team_a_score + 1
+        scored = self.team_b_score
+        remaining_runs = target - scored
+        remaining_overs = self.overs_per_innings - (self.team_b_overs or 0)
+        
+        if remaining_overs <= 0:
+            return 0.0
+        
+        return round(remaining_runs / remaining_overs, 2)
 
 
 class CricketBall(Base):

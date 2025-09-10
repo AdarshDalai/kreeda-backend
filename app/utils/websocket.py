@@ -1,102 +1,164 @@
-from typing import Dict, Set, Any
+from typing import Dict, Set, Any, Optional
 from fastapi import WebSocket
 import json
 import logging
 import uuid
+import random
 
 logger = logging.getLogger(__name__)
 
 
-class WebSocketManager:
-    """Manage WebSocket connections for real-time updates"""
+class MatchWebSocketManager:
+    """WebSocket manager for real-time match updates"""
     
     def __init__(self):
-        # Store connections by match_id
-        self.active_connections: Dict[str, Set[WebSocket]] = {}
+        # Active connections per match
+        self.match_connections: Dict[str, Set[WebSocket]] = {}
+        # User connections for notifications
+        self.user_connections: Dict[str, WebSocket] = {}
     
-    async def connect(self, websocket: WebSocket, match_id: str):
-        """Accept new WebSocket connection"""
+    async def connect_to_match(self, websocket: WebSocket, match_id: str, user_id: Optional[str] = None):
+        """Connect user to match updates"""
         await websocket.accept()
         
-        if match_id not in self.active_connections:
-            self.active_connections[match_id] = set()
+        if match_id not in self.match_connections:
+            self.match_connections[match_id] = set()
         
-        self.active_connections[match_id].add(websocket)
-        logger.info(f"WebSocket connected to match {match_id}")
-    
-    def disconnect(self, websocket: WebSocket, match_id: str):
-        """Remove WebSocket connection"""
-        if match_id in self.active_connections:
-            self.active_connections[match_id].discard(websocket)
-            
-            # Clean up empty sets
-            if not self.active_connections[match_id]:
-                del self.active_connections[match_id]
+        self.match_connections[match_id].add(websocket)
         
-        logger.info(f"WebSocket disconnected from match {match_id}")
+        if user_id:
+            self.user_connections[user_id] = websocket
+        
+        logger.info(f"User {user_id} connected to match {match_id}")
     
-    async def send_personal_message(self, message: str, websocket: WebSocket):
-        """Send message to specific WebSocket"""
-        try:
-            await websocket.send_text(message)
-        except Exception as e:
-            logger.error(f"Error sending personal message: {e}")
+    def disconnect_from_match(self, websocket: WebSocket, match_id: str, user_id: Optional[str] = None):
+        """Disconnect user from match updates"""
+        if match_id in self.match_connections:
+            self.match_connections[match_id].discard(websocket)
+            if not self.match_connections[match_id]:
+                del self.match_connections[match_id]
+        
+        if user_id and user_id in self.user_connections:
+            del self.user_connections[user_id]
+        
+        logger.info(f"User {user_id} disconnected from match {match_id}")
     
-    async def broadcast_to_match(self, match_id: str, data: Dict[str, Any]):
-        """Broadcast message to all connections for a specific match"""
-        if match_id not in self.active_connections:
+    async def broadcast_ball_update(self, match_id: str, ball_data: dict, scorecard: dict):
+        """Broadcast ball update to all match watchers"""
+        if match_id not in self.match_connections:
             return
         
-        message = json.dumps(data)
-        connections_to_remove = []
-        
-        for connection in self.active_connections[match_id].copy():
-            try:
-                await connection.send_text(message)
-            except Exception as e:
-                logger.error(f"Error broadcasting to connection: {e}")
-                connections_to_remove.append(connection)
-        
-        # Remove dead connections
-        for connection in connections_to_remove:
-            self.disconnect(connection, match_id)
-    
-    async def send_ball_update(self, match_id: str, ball_data: Dict[str, Any], scorecard: Dict[str, Any]):
-        """Send ball update to all match subscribers"""
-        await self.broadcast_to_match(match_id, {
+        message = {
             "type": "ball_update",
             "match_id": match_id,
-            "data": {
-                "ball_details": ball_data,
-                "updated_scorecard": scorecard,
-                "timestamp": str(uuid.uuid4())  # Simple timestamp alternative
-            }
-        })
+            "ball": ball_data,
+            "scorecard": scorecard,
+            "timestamp": str(uuid.uuid4())  # Simple timestamp alternative
+        }
+        
+        connections_to_remove = []
+        for websocket in self.match_connections[match_id]:
+            try:
+                await websocket.send_text(json.dumps(message))
+            except Exception as e:
+                logger.error(f"Error sending message to websocket: {e}")
+                connections_to_remove.append(websocket)
+        
+        # Remove failed connections
+        for websocket in connections_to_remove:
+            self.match_connections[match_id].discard(websocket)
     
-    async def send_wicket_update(self, match_id: str, wicket_data: Dict[str, Any]):
-        """Send wicket update to all match subscribers"""
-        await self.broadcast_to_match(match_id, {
-            "type": "wicket",
+    async def broadcast_wicket_alert(self, match_id: str, wicket_data: dict):
+        """Special broadcast for wicket events"""
+        if match_id not in self.match_connections:
+            return
+        
+        message = {
+            "type": "wicket_alert",
             "match_id": match_id,
-            "data": wicket_data
-        })
+            "wicket": wicket_data,
+            "commentary": self._generate_wicket_commentary(wicket_data)
+        }
+        
+        await self._broadcast_to_match(match_id, message)
     
-    async def send_innings_complete(self, match_id: str, innings_data: Dict[str, Any]):
-        """Send innings completion update"""
-        await self.broadcast_to_match(match_id, {
-            "type": "innings_complete", 
+    async def broadcast_boundary_alert(self, match_id: str, boundary_data: dict):
+        """Special broadcast for boundary events"""
+        if match_id not in self.match_connections:
+            return
+        
+        message = {
+            "type": "boundary_alert",
             "match_id": match_id,
-            "data": innings_data
-        })
+            "boundary": boundary_data,
+            "commentary": self._generate_boundary_commentary(boundary_data)
+        }
+        
+        await self._broadcast_to_match(match_id, message)
     
-    async def send_match_complete(self, match_id: str, result_data: Dict[str, Any]):
-        """Send match completion update"""
-        await self.broadcast_to_match(match_id, {
-            "type": "match_complete",
+    async def broadcast_match_completed(self, match_id: str, result_data: dict):
+        """Broadcast match completion"""
+        message = {
+            "type": "match_completed",
             "match_id": match_id,
-            "data": result_data
-        })
+            "result": result_data
+        }
+        
+        await self._broadcast_to_match(match_id, message)
+    
+    async def _broadcast_to_match(self, match_id: str, message: dict):
+        """Internal method to broadcast message to all match watchers"""
+        if match_id not in self.match_connections:
+            return
+        
+        connections_to_remove = []
+        for websocket in self.match_connections[match_id]:
+            try:
+                await websocket.send_text(json.dumps(message))
+            except Exception as e:
+                logger.error(f"Error broadcasting to websocket: {e}")
+                connections_to_remove.append(websocket)
+        
+        # Remove failed connections
+        for websocket in connections_to_remove:
+            self.match_connections[match_id].discard(websocket)
+    
+    def _generate_wicket_commentary(self, wicket_data: dict) -> str:
+        """Generate commentary for wicket events"""
+        wicket_type = wicket_data.get("wicket_type", "").replace("_", " ").title()
+        player_name = wicket_data.get("dismissed_player_name", "Batsman")
+        
+        comments = {
+            "Bowled": [f"BOWLED! {player_name} has been cleaned up!", f"Timber! {wicket_type} dismissal!"],
+            "Caught": [f"CAUGHT! Excellent fielding!", f"What a catch! {player_name} has to go!"],
+            "Lbw": [f"LBW! That looked plumb!", f"Up goes the finger! {player_name} is out LBW!"],
+            "Run Out": [f"RUN OUT! Mix-up in the middle!", f"Direct hit! {player_name} is well short!"],
+            "Stumped": [f"STUMPED! Lightning quick work from the keeper!", f"Brilliant stumping! {player_name} is out!"]
+        }
+        
+        return random.choice(comments.get(wicket_type, [f"WICKET! {player_name} is out!"]))
+    
+    def _generate_boundary_commentary(self, boundary_data: dict) -> str:
+        """Generate commentary for boundary events"""
+        runs = boundary_data.get("runs_scored", 4)
+        
+        if runs == 6:
+            comments = [
+                "SIX! What a massive hit!",
+                "Maximum! That's gone out of the park!",
+                "SIX! Absolutely smashed!",
+                "Into the stands! Fantastic shot!"
+            ]
+        else:
+            comments = [
+                "FOUR! Beautiful stroke!",
+                "Boundary! Perfect timing!",
+                "FOUR! Races away to the fence!",
+                "What a shot! Four runs!"
+            ]
+        
+        return random.choice(comments)
 
 
 # Global WebSocket manager instance
-manager = WebSocketManager()
+websocket_manager = MatchWebSocketManager()

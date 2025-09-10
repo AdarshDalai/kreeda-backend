@@ -153,3 +153,7 @@ logs/
 .env.example
 .env
 kreeda_copilot_prompt.md
+app/models/scoring_integrity.py
+openapi_spec.json
+.gitignore
+.gitignore

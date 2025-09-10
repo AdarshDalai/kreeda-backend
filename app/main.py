@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
@@ -6,7 +6,8 @@ import logging
 
 from app.config import settings
 from app.utils.database import init_db
-from app.api import auth, users, teams, cricket
+from app.api import auth, users, teams, cricket, stats
+from app.api import cricket_integrity
 
 
 # Configure logging
@@ -91,6 +92,24 @@ app.include_router(auth.router, prefix=f"{settings.api_v1_str}/auth", tags=["aut
 app.include_router(users.router, prefix=f"{settings.api_v1_str}/users", tags=["users"])
 app.include_router(teams.router, prefix=f"{settings.api_v1_str}/teams", tags=["teams"])
 app.include_router(cricket.router, prefix=f"{settings.api_v1_str}/matches", tags=["cricket"])
+app.include_router(cricket_integrity.router, prefix=f"{settings.api_v1_str}/matches", tags=["cricket-integrity"])
+app.include_router(stats.router, prefix=f"{settings.api_v1_str}/stats", tags=["statistics"])
+
+
+# WebSocket endpoint for live match updates
+@app.websocket("/ws/matches/{match_id}")
+async def websocket_endpoint(websocket: WebSocket, match_id: str):
+    from app.utils.websocket import websocket_manager
+    
+    await websocket_manager.connect_to_match(websocket, match_id)
+    try:
+        while True:
+            # Keep connection alive and listen for disconnection
+            await websocket.receive_text()
+    except Exception as e:
+        logger.info(f"WebSocket connection closed: {e}")
+    finally:
+        websocket_manager.disconnect_from_match(websocket, match_id)
 
 
 if __name__ == "__main__":
