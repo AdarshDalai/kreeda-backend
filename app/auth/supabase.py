@@ -1,13 +1,15 @@
-from supabase import create_client, Client
+from supabase.client import create_client, Client
 from app.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Initialize Supabase client
-supabase: Client = None
+from typing import Optional
 
-def get_supabase_client() -> Client:
+# Initialize Supabase client
+supabase: Optional[Client] = None
+
+def get_supabase_client() -> Optional[Client]:
     """Get Supabase client instance"""
     global supabase
     if supabase is None:
@@ -37,7 +39,7 @@ def verify_supabase_token(token: str) -> dict:
         
         # Get user from token
         response = client.auth.get_user(token)
-        if response.user:
+        if response and getattr(response, "user", None):
             return {
                 "user_id": response.user.id,
                 "email": response.user.email,
