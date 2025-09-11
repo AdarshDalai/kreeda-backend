@@ -70,7 +70,7 @@ jobs:
 
     - name: Import sorting check (isort)
       run: |
-        isort --check-only --diff app/
+        isort --check-only --diff --profile black app/
 
     - name: Linting (flake8)
       run: |
