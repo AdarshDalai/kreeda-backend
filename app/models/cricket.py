@@ -1,17 +1,18 @@
+import uuid
+
 from sqlalchemy import (
-    Column,
-    String,
-    Integer,
     Boolean,
+    Column,
     DateTime,
-    ForeignKey,
     Float,
+    ForeignKey,
+    Integer,
+    String,
     Text,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-import uuid
+from sqlalchemy.sql import func
 
 from app.utils.database import Base
 

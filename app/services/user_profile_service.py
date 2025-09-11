@@ -1,33 +1,34 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func, update, delete
-from sqlalchemy.orm import selectinload
-from typing import List, Optional, Dict, Any
+import json
 import logging
 from datetime import datetime, timedelta
-import json
-from fastapi import UploadFile
+from typing import Any, Dict, List, Optional
 
+from fastapi import UploadFile
+from sqlalchemy import and_, delete, func, or_, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.auth import supabase_auth
 from app.models.user import User
 from app.models.user_profile import (
+    UserAchievement,
+    UserActivityLog,
     UserProfile,
     UserSecuritySettings,
-    UserActivityLog,
     UserSession,
-    UserAchievement,
 )
+from app.schemas.user_profile import UserActivityLog as ActivityLogSchema
 from app.schemas.user_profile import (
-    UserProfileUpdate,
-    UserPasswordChange,
-    UserPrivacySettings,
-    UserNotificationSettings,
-    UserPreferencesSettings,
-    UserSportsProfile,
-    UserProfileResponse,
     UserDashboardStats,
-    UserActivityLog as ActivityLogSchema,
+    UserNotificationSettings,
+    UserPasswordChange,
+    UserPreferencesSettings,
+    UserPrivacySettings,
+    UserProfileResponse,
+    UserProfileUpdate,
+    UserSportsProfile,
 )
 from app.utils.file_upload import FileUploadService
-from app.auth import supabase_auth
 
 logger = logging.getLogger(__name__)
 

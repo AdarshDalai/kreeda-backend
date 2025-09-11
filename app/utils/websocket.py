@@ -1,9 +1,10 @@
-from typing import Dict, Set, Any, Optional
-from fastapi import WebSocket
 import json
 import logging
-import uuid
 import random
+import uuid
+from typing import Any, Dict, Optional, Set
+
+from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
 

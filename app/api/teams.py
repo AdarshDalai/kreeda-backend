@@ -1,16 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
-from typing import List, Optional
 import logging
 import uuid
-from pydantic import BaseModel, ConfigDict
 from datetime import datetime
+from typing import List, Optional
 
-from app.utils.database import get_db
-from app.models.user import User, Team, TeamMember
-from app.schemas.team import TeamCreate, TeamMemberResponse
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.auth.middleware import get_current_active_user
+from app.models.user import Team, TeamMember, User
+from app.schemas.team import TeamCreate, TeamMemberResponse
+from app.utils.database import get_db
 
 
 # Simple response schema without relationships to avoid async issues

@@ -1,12 +1,13 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_
-from sqlalchemy.orm import selectinload
-from typing import List, Optional, Dict, Any
 import logging
+from typing import Any, Dict, List, Optional
 
+from sqlalchemy import and_, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.auth import supabase_auth
 from app.models.user import User
 from app.schemas.user import UserUpdate
-from app.auth import supabase_auth
 
 logger = logging.getLogger(__name__)
 

@@ -1,14 +1,13 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from contextlib import asynccontextmanager
-import logging
 
+from app.api import auth, cricket, cricket_integrity, stats, teams, user_profile, users
 from app.config import settings
 from app.utils.database import init_db
-from app.api import auth, users, teams, cricket, stats, user_profile
-from app.api import cricket_integrity
-
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

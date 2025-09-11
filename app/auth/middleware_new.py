@@ -1,16 +1,17 @@
-from fastapi import HTTPException, Depends, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from jose import JWTError, jwt
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
-import logging
 
-from app.config import settings
-from app.utils.database import get_db
-from app.models.user import User
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.auth.supabase_auth import get_user_from_token
+from app.config import settings
+from app.models.user import User
+from app.utils.database import get_db
 
 logger = logging.getLogger(__name__)
 

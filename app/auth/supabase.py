@@ -1,8 +1,10 @@
-from supabase.client import create_client, Client
-from supabase.lib.client_options import ClientOptions
-from app.config import settings
 import logging
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
+from supabase.client import Client, create_client
+from supabase.lib.client_options import ClientOptions
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 

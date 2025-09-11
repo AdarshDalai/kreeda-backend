@@ -1,6 +1,6 @@
 # Import all models to ensure they are registered with SQLAlchemy
-from app.models.user import User, Team, TeamMember
-from app.models.cricket import CricketMatch, CricketBall, MatchPlayerStats
+from app.models.cricket import CricketBall, CricketMatch, MatchPlayerStats
+from app.models.user import Team, TeamMember, User
 
 __all__ = [
     "User",

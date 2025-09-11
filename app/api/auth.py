@@ -1,24 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 import logging
 
-from app.utils.database import get_db
-from app.models.user import User
-from app.schemas.user import UserResponse
-from app.schemas.auth import (
-    UserRegister,
-    UserLogin,
-    Token,
-    RefreshTokenRequest,
-    PasswordResetRequest,
-    OTPVerification,
-    UserUpdate,
-    OAuthProvider,
-)
-from app.auth.middleware import get_current_active_user
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.auth import supabase_auth
+from app.auth.middleware import get_current_active_user
 from app.config import settings
+from app.models.user import User
+from app.schemas.auth import (
+    OAuthProvider,
+    OTPVerification,
+    PasswordResetRequest,
+    RefreshTokenRequest,
+    Token,
+    UserLogin,
+    UserRegister,
+    UserUpdate,
+)
+from app.schemas.user import UserResponse
+from app.utils.database import get_db
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

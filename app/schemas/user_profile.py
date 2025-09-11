@@ -1,8 +1,9 @@
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from typing import Optional, Dict, Any, List
+import uuid
 from datetime import datetime
 from enum import Enum
-import uuid
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class NotificationPreference(str, Enum):

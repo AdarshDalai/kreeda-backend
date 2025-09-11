@@ -1,7 +1,8 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import MetaData
 import logging
+
+from sqlalchemy import MetaData
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.declarative import declarative_base
 
 from app.config import settings
 
@@ -31,7 +32,7 @@ async def init_db():
     try:
         async with engine.begin() as conn:
             # Import all models to register them with Base
-            from app.models import user, cricket  # noqa: F401
+            from app.models import cricket, user  # noqa: F401
 
             # Create all tables
             await conn.run_sync(Base.metadata.create_all)

@@ -1,5 +1,7 @@
 from logging.config import fileConfig
+
 from sqlalchemy import engine_from_config, pool
+
 from alembic import context
 
 # this is the Alembic Config object, which provides
@@ -11,10 +13,11 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+from app.models import cricket, user  # Import all models
+
 # add your model's MetaData object here
 # for 'autogenerate' support
 from app.utils.database import Base
-from app.models import user, cricket  # Import all models
 
 target_metadata = Base.metadata
 

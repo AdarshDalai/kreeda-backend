@@ -1,24 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
 import logging
+from typing import List, Optional
 
-from app.utils.database import get_db
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.auth.middleware import get_current_user
 from app.models.user import User
-from app.services.user_profile_service import UserProfileService
 from app.schemas.user_profile import (
-    UserProfileUpdate,
-    UserPasswordChange,
-    UserPrivacySettings,
-    UserNotificationSettings,
-    UserPreferencesSettings,
-    UserSportsProfile,
-    UserProfileResponse,
-    UserDashboardStats,
     UserActivityLog,
+    UserDashboardStats,
+    UserNotificationSettings,
+    UserPasswordChange,
+    UserPreferencesSettings,
+    UserPrivacySettings,
+    UserProfileResponse,
+    UserProfileUpdate,
+    UserSportsProfile,
 )
+from app.services.user_profile_service import UserProfileService
+from app.utils.database import get_db
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/profile", tags=["User Profile"])
