@@ -12,10 +12,11 @@ from app.models.user import User, Team, TeamMember
 from app.schemas.team import TeamCreate, TeamMemberResponse
 from app.auth.middleware import get_current_active_user
 
+
 # Simple response schema without relationships to avoid async issues
 class TeamSimpleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: uuid.UUID
     name: str
     short_name: str
@@ -24,6 +25,7 @@ class TeamSimpleResponse(BaseModel):
     captain_id: uuid.UUID
     created_at: datetime
     is_active: bool
+
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +41,7 @@ async def teams_health():
 async def create_team(
     team_data: TeamCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Create a new cricket team"""
     try:
@@ -49,40 +51,40 @@ async def create_team(
             short_name=team_data.short_name,
             logo_url=team_data.logo_url,
             created_by_id=current_user.id,
-            captain_id=current_user.id  # Creator is captain by default
+            captain_id=current_user.id,  # Creator is captain by default
         )
-        
+
         db.add(new_team)
         await db.commit()
         await db.refresh(new_team)
-        
+
         # Add creator as team member
         team_member = TeamMember(
             team_id=new_team.id,
             user_id=current_user.id,
             role="captain",
-            joined_at=new_team.created_at
+            joined_at=new_team.created_at,
         )
-        
+
         db.add(team_member)
         await db.commit()
-        
+
         logger.info(f"Team created: {new_team.name} by {current_user.username}")
         return new_team
-        
+
     except Exception as e:
         logger.error(f"Failed to create team: {e}")
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create team"
+            detail="Failed to create team",
         )
 
 
 @router.get("/", response_model=List[TeamSimpleResponse])
 async def get_user_teams(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get all teams for current user"""
     try:
@@ -94,14 +96,14 @@ async def get_user_teams(
             .where(Team.is_active == True)
         )
         teams = result.scalars().all()
-        
+
         return teams
-        
+
     except Exception as e:
         logger.error(f"Failed to get user teams: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve teams"
+            detail="Failed to retrieve teams",
         )
 
 
@@ -109,7 +111,7 @@ async def get_user_teams(
 async def get_team(
     team_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get specific team details"""
     try:
@@ -122,22 +124,22 @@ async def get_team(
             .where(Team.is_active == True)
         )
         team = result.scalar_one_or_none()
-        
+
         if not team:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Team not found or access denied"
+                detail="Team not found or access denied",
             )
-        
+
         return team
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to get team: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve team"
+            detail="Failed to retrieve team",
         )
 
 
@@ -145,7 +147,7 @@ async def get_team(
 async def get_team_members(
     team_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get all members of a team"""
     try:
@@ -157,27 +159,24 @@ async def get_team_members(
         )
         if not result.scalar_one_or_none():
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied"
+                status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
             )
-        
+
         # Get all team members
         result = await db.execute(
-            select(TeamMember)
-            .join(User)
-            .where(TeamMember.team_id == team_id)
+            select(TeamMember).join(User).where(TeamMember.team_id == team_id)
         )
         members = result.scalars().all()
-        
+
         return members
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to get team members: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve team members"
+            detail="Failed to retrieve team members",
         )
 
 
@@ -185,7 +184,7 @@ async def get_team_members(
 async def join_team(
     team_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Join an existing team"""
     try:
@@ -194,13 +193,12 @@ async def join_team(
             select(Team).where(Team.id == team_id).where(Team.is_active == True)
         )
         team = result.scalar_one_or_none()
-        
+
         if not team:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Team not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Team not found"
             )
-        
+
         # Check if already a member
         result = await db.execute(
             select(TeamMember)
@@ -210,22 +208,20 @@ async def join_team(
         if result.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Already a member of this team"
+                detail="Already a member of this team",
             )
-        
+
         # Add as team member
         team_member = TeamMember(
-            team_id=team_id,
-            user_id=current_user.id,
-            role="player"
+            team_id=team_id, user_id=current_user.id, role="player"
         )
-        
+
         db.add(team_member)
         await db.commit()
-        
+
         logger.info(f"User {current_user.username} joined team {team.name}")
         return {"message": "Successfully joined team"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -233,7 +229,7 @@ async def join_team(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to join team"
+            detail="Failed to join team",
         )
 
 
@@ -241,7 +237,7 @@ async def join_team(
 async def delete_team(
     team_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Delete a team (only captain can delete)"""
     try:
@@ -253,24 +249,20 @@ async def delete_team(
             .where(Team.is_active == True)
         )
         team = result.scalar_one_or_none()
-        
+
         if not team:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Team not found or you're not the captain"
+                detail="Team not found or you're not the captain",
             )
-        
+
         # Soft delete the team
-        await db.execute(
-            update(Team)
-            .where(Team.id == team_id)
-            .values(is_active=False)
-        )
+        await db.execute(update(Team).where(Team.id == team_id).values(is_active=False))
         await db.commit()
-        
+
         logger.info(f"Team {team.name} deleted by {current_user.username}")
         return {"message": "Team deleted successfully"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -278,5 +270,5 @@ async def delete_team(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete team"
+            detail="Failed to delete team",
         )

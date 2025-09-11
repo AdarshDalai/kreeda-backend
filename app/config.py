@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "postgresql://kreeda:password@localhost:5432/kreeda_dev"
-    
+
     # Redis Configuration
     redis_url: str = "redis://localhost:6379"
     upstash_redis_url: str = ""
@@ -43,11 +43,11 @@ class Settings(BaseSettings):
 
     # CORS
     backend_cors_origins: str = '["http://localhost:3000", "http://localhost:8080"]'
-    
+
     # Logging
     log_level: str = "INFO"
     log_format: str = "json"
-    
+
     # WebSocket
     ws_heartbeat_interval: int = 30
 

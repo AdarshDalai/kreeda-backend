@@ -9,7 +9,12 @@ from datetime import datetime
 from app.utils.database import get_db
 from app.models.user import User
 from app.models.cricket import CricketMatch, CricketBall
-from app.schemas.cricket import CricketMatchCreate, BallRecord, BallResponse, MatchResponseBasic
+from app.schemas.cricket import (
+    CricketMatchCreate,
+    BallRecord,
+    BallResponse,
+    MatchResponseBasic,
+)
 from app.auth.middleware import get_current_active_user
 from app.services.cricket_service import CricketService
 
@@ -26,7 +31,7 @@ async def cricket_health():
 async def create_match(
     match_data: CricketMatchCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Create a new cricket match"""
     try:
@@ -37,29 +42,29 @@ async def create_match(
             overs_per_innings=match_data.overs_per_innings,
             venue=match_data.venue,
             match_date=match_data.match_date,
-            created_by_id=current_user.id
+            created_by_id=current_user.id,
         )
-        
+
         db.add(new_match)
         await db.commit()
         await db.refresh(new_match)
-        
+
         logger.info(f"Match created: {new_match.id} by {current_user.username}")
         return new_match
-        
+
     except Exception as e:
         logger.error(f"Failed to create match: {e}")
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create match"
+            detail="Failed to create match",
         )
 
 
 @router.get("/cricket", response_model=List[MatchResponseBasic])
 async def get_matches(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get all matches"""
     try:
@@ -67,14 +72,14 @@ async def get_matches(
             select(CricketMatch).order_by(CricketMatch.created_at.desc())
         )
         matches = result.scalars().all()
-        
+
         return matches
-        
+
     except Exception as e:
         logger.error(f"Failed to get matches: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve matches"
+            detail="Failed to retrieve matches",
         )
 
 
@@ -82,7 +87,7 @@ async def get_matches(
 async def get_match(
     match_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get specific match details"""
     try:
@@ -90,22 +95,21 @@ async def get_match(
             select(CricketMatch).where(CricketMatch.id == match_id)
         )
         match = result.scalar_one_or_none()
-        
+
         if not match:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Match not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Match not found"
             )
-        
+
         return match
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to get match: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve match"
+            detail="Failed to retrieve match",
         )
 
 
@@ -114,7 +118,7 @@ async def record_ball(
     match_id: uuid.UUID,
     ball_data: BallRecord,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Record a ball in the cricket match"""
     try:
@@ -123,26 +127,25 @@ async def record_ball(
             select(CricketMatch).where(CricketMatch.id == match_id)
         )
         match = result.scalar_one_or_none()
-        
+
         if not match:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Match not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Match not found"
             )
-        
+
         # Use cricket service to record ball
         cricket_service = CricketService(db)
         ball, scorecard = await cricket_service.record_ball(str(match_id), ball_data)
-        
+
         logger.info(f"Ball recorded in match {match_id}")
         return ball
-        
+
     except Exception as e:
         logger.error(f"Failed to record ball: {e}")
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to record ball"
+            detail="Failed to record ball",
         )
 
 
@@ -150,7 +153,7 @@ async def record_ball(
 async def get_scorecard(
     match_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get live scorecard for a match"""
     try:
@@ -159,24 +162,23 @@ async def get_scorecard(
             select(CricketMatch).where(CricketMatch.id == match_id)
         )
         match = result.scalar_one_or_none()
-        
+
         if not match:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Match not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Match not found"
             )
-        
+
         # Generate scorecard
         cricket_service = CricketService(db)
         scorecard = await cricket_service.get_match_scorecard(str(match_id))
-        
+
         return scorecard
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to get scorecard: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve scorecard"
+            detail="Failed to retrieve scorecard",
         )

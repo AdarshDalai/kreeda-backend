@@ -4,7 +4,7 @@ from app.models.cricket import CricketMatch, CricketBall, MatchPlayerStats
 
 __all__ = [
     "User",
-    "Team", 
+    "Team",
     "TeamMember",
     "CricketMatch",
     "CricketBall",

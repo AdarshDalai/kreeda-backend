@@ -32,7 +32,7 @@ async def init_db():
         async with engine.begin() as conn:
             # Import all models to register them with Base
             from app.models import user, cricket  # noqa: F401
-            
+
             # Create all tables
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database initialized successfully")

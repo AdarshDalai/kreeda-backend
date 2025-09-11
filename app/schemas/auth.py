@@ -45,7 +45,15 @@ class PasswordResetRequest(BaseModel):
 class OTPVerification(BaseModel):
     email: EmailStr
     token: str
-    type: Literal["signup", "invite", "magiclink", "recovery", "email_change_current", "email_change_new", "phone_change"] = "signup"
+    type: Literal[
+        "signup",
+        "invite",
+        "magiclink",
+        "recovery",
+        "email_change_current",
+        "email_change_new",
+        "phone_change",
+    ] = "signup"
 
 
 class UserUpdate(BaseModel):
@@ -56,7 +64,20 @@ class UserUpdate(BaseModel):
 
 
 class OAuthProvider(BaseModel):
-    provider: Literal["google", "github", "discord", "facebook", "apple", "azure", "bitbucket", "gitlab", "linkedin", "spotify", "twitch", "twitter"]
+    provider: Literal[
+        "google",
+        "github",
+        "discord",
+        "facebook",
+        "apple",
+        "azure",
+        "bitbucket",
+        "gitlab",
+        "linkedin",
+        "spotify",
+        "twitch",
+        "twitter",
+    ]
     redirect_to: Optional[str] = None
 
 

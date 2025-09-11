@@ -90,18 +90,28 @@ async def health_check():
 # Include API routers
 app.include_router(auth.router, prefix=f"{settings.api_v1_str}/auth", tags=["auth"])
 app.include_router(users.router, prefix=f"{settings.api_v1_str}/users", tags=["users"])
-app.include_router(user_profile.router, prefix=f"{settings.api_v1_str}/user", tags=["user-profile"])
+app.include_router(
+    user_profile.router, prefix=f"{settings.api_v1_str}/user", tags=["user-profile"]
+)
 app.include_router(teams.router, prefix=f"{settings.api_v1_str}/teams", tags=["teams"])
-app.include_router(cricket.router, prefix=f"{settings.api_v1_str}/matches", tags=["cricket"])
-app.include_router(cricket_integrity.router, prefix=f"{settings.api_v1_str}/matches", tags=["cricket-integrity"])
-app.include_router(stats.router, prefix=f"{settings.api_v1_str}/stats", tags=["statistics"])
+app.include_router(
+    cricket.router, prefix=f"{settings.api_v1_str}/matches", tags=["cricket"]
+)
+app.include_router(
+    cricket_integrity.router,
+    prefix=f"{settings.api_v1_str}/matches",
+    tags=["cricket-integrity"],
+)
+app.include_router(
+    stats.router, prefix=f"{settings.api_v1_str}/stats", tags=["statistics"]
+)
 
 
 # WebSocket endpoint for live match updates
 @app.websocket("/ws/matches/{match_id}")
 async def websocket_endpoint(websocket: WebSocket, match_id: str):
     from app.utils.websocket import websocket_manager
-    
+
     await websocket_manager.connect_to_match(websocket, match_id)
     try:
         while True:

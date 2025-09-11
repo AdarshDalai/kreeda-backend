@@ -25,7 +25,7 @@ class TeamUpdate(BaseModel):
 
 class TeamMemberResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
+
     user_id: uuid.UUID
     role: str
     jersey_number: Optional[str] = None
@@ -35,7 +35,7 @@ class TeamMemberResponse(BaseModel):
 
 class TeamResponse(TeamBase):
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: uuid.UUID
     created_by_id: uuid.UUID
     captain_id: uuid.UUID
@@ -54,7 +54,7 @@ class TeamMemberAdd(BaseModel):
 
 class TeamSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: uuid.UUID
     name: str
     short_name: str

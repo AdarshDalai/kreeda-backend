@@ -26,7 +26,7 @@ class UserUpdate(BaseModel):
 
 class UserResponse(UserBase):
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: uuid.UUID
     avatar_url: Optional[str] = None
     created_at: datetime
@@ -35,7 +35,7 @@ class UserResponse(UserBase):
 
 class UserSearch(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: uuid.UUID
     username: str
     full_name: str

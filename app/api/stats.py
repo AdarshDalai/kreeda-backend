@@ -22,23 +22,20 @@ async def stats_health():
 async def get_player_stats(
     player_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get comprehensive player statistics"""
     try:
         stats_engine = CricketStatsEngine(db)
         stats = await stats_engine.get_player_career_stats(player_id)
-        
-        return {
-            "success": True,
-            "data": stats
-        }
-        
+
+        return {"success": True, "data": stats}
+
     except Exception as e:
         logger.error(f"Error fetching player stats: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch player statistics"
+            detail="Failed to fetch player statistics",
         )
 
 
@@ -47,23 +44,20 @@ async def get_team_stats(
     team_id: str,
     season_year: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get team statistics"""
     try:
         stats_engine = CricketStatsEngine(db)
         stats = await stats_engine.get_team_stats(team_id, season_year)
-        
-        return {
-            "success": True,
-            "data": stats
-        }
-        
+
+        return {"success": True, "data": stats}
+
     except Exception as e:
         logger.error(f"Error fetching team stats: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch team statistics"
+            detail="Failed to fetch team statistics",
         )
 
 
@@ -72,23 +66,20 @@ async def get_team_form(
     team_id: str,
     last_matches: int = 5,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get recent form for a team"""
     try:
         stats_engine = CricketStatsEngine(db)
         form = await stats_engine.get_recent_form(team_id, last_matches)
-        
-        return {
-            "success": True,
-            "data": form
-        }
-        
+
+        return {"success": True, "data": form}
+
     except Exception as e:
         logger.error(f"Error fetching team form: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch team form"
+            detail="Failed to fetch team form",
         )
 
 
@@ -96,29 +87,25 @@ async def get_team_form(
 async def get_match_insights(
     match_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get detailed match insights and analytics"""
     try:
         stats_engine = CricketStatsEngine(db)
         insights = await stats_engine.get_match_insights(match_id)
-        
+
         if "error" in insights:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=insights["error"]
+                status_code=status.HTTP_404_NOT_FOUND, detail=insights["error"]
             )
-        
-        return {
-            "success": True,
-            "data": insights
-        }
-        
+
+        return {"success": True, "data": insights}
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error fetching match insights: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch match insights"
+            detail="Failed to fetch match insights",
         )
