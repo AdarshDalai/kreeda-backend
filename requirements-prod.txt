@@ -1,0 +1,38 @@
+# Production requirements for Render deployment
+# Core FastAPI and ASGI server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Database
+sqlalchemy[asyncio]==2.0.23
+asyncpg==0.29.0
+alembic==1.12.1
+
+# Authentication and Security
+supabase==2.0.2
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Redis for caching
+redis==5.0.1
+
+# File uploads and storage
+aiofiles==23.2.1
+boto3==1.34.0
+
+# Data validation
+pydantic==2.5.0
+pydantic[email]==2.5.0
+
+# HTTP client
+httpx==0.25.2
+
+# Environment management
+python-dotenv==1.0.0
+
+# Production monitoring (optional)
+gunicorn==21.2.0
+
+# Additional utilities
+python-json-logger==2.0.7
