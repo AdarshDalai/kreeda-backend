@@ -150,7 +150,6 @@ Thumbs.db
 # Logs
 logs/
 *.log
-.env.example
 .env
 kreeda_copilot_prompt.md
 app/models/scoring_integrity.py
