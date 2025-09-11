@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: kreeda-backend
+    runtime: python
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: PYTHON_VERSION
+        value: "3.11.12"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kreeda-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: kreeda-redis
+          property: connectionString
+
+  - type: redis
+    name: kreeda-redis
+    plan: starter
+    ipAllowList: []
+
+databases:
+  - name: kreeda-db
+    databaseName: kreeda
+    user: kreeda
+    plan: starter

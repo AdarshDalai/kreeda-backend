@@ -6,7 +6,7 @@ import logging
 
 from app.config import settings
 from app.utils.database import init_db
-from app.api import auth, users, teams, cricket, stats
+from app.api import auth, users, teams, cricket, stats, user_profile
 from app.api import cricket_integrity
 
 
@@ -90,6 +90,7 @@ async def health_check():
 # Include API routers
 app.include_router(auth.router, prefix=f"{settings.api_v1_str}/auth", tags=["auth"])
 app.include_router(users.router, prefix=f"{settings.api_v1_str}/users", tags=["users"])
+app.include_router(user_profile.router, prefix=f"{settings.api_v1_str}/user", tags=["user-profile"])
 app.include_router(teams.router, prefix=f"{settings.api_v1_str}/teams", tags=["teams"])
 app.include_router(cricket.router, prefix=f"{settings.api_v1_str}/matches", tags=["cricket"])
 app.include_router(cricket_integrity.router, prefix=f"{settings.api_v1_str}/matches", tags=["cricket-integrity"])

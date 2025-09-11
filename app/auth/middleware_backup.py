@@ -4,7 +4,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
-from typing import Optional
 import logging
 
 from app.config import settings
@@ -18,7 +17,7 @@ logger = logging.getLogger(__name__)
 security = HTTPBearer()
 
 # JWT Functions (for backwards compatibility)
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+def create_access_token(data: dict, expires_delta: timedelta = None):
     """Create JWT access token"""
     to_encode = data.copy()
     if expires_delta:
@@ -35,7 +34,7 @@ def verify_token(token: str):
     """Verify JWT token"""
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
-        user_id = payload.get("sub")
+        user_id: str = payload.get("sub")
         if user_id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -73,7 +72,8 @@ async def get_current_user(
                 
                 if not user:
                     # Create user if doesn't exist in local db
-                    user = User(
+                    from app.models.user import User as UserModel
+                    user = UserModel(
                         supabase_id=supabase_id,
                         email=supabase_user_data.get("email", ""),
                         username=supabase_user_data.get("user_metadata", {}).get("username", 
@@ -110,7 +110,11 @@ async def get_current_user(
                     return user
             except Exception as jwt_error:
                 logger.debug(f"Local JWT verification also failed: {jwt_error}")
-                pass  # Will raise the final exception below
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Could not validate credentials",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
         
         # If we get here, both token types failed
         raise HTTPException(
@@ -132,6 +136,29 @@ async def get_current_user(
 
 def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
     """Get current active user"""
-    if not getattr(current_user, 'is_active', True):
+    if not current_user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    return current_user
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User not found"
+                )
+            
+            return user
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Authentication error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
+    """Get current active user"""
+    if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user

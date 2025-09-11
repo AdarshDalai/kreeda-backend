@@ -27,6 +27,13 @@ class User(Base):
     captained_teams = relationship("Team", foreign_keys="Team.captain_id", back_populates="captain")
     team_memberships = relationship("TeamMember", back_populates="user")
     created_matches = relationship("CricketMatch", foreign_keys="CricketMatch.created_by_id", back_populates="creator")
+    
+    # Profile relationships
+    profile = relationship("UserProfile", back_populates="user", uselist=False)
+    security_settings = relationship("UserSecuritySettings", back_populates="user", uselist=False)
+    activity_logs = relationship("UserActivityLog", back_populates="user")
+    sessions = relationship("UserSession", back_populates="user")
+    achievements = relationship("UserAchievement", back_populates="user")
 
 
 class Team(Base):
