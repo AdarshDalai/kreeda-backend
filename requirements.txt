@@ -31,7 +31,7 @@ redis
 boto3  # For S3-compatible storage (Cloudflare R2)
 
 # HTTP Client
-httpx>
+httpx
 
 # WebSockets
 websockets
