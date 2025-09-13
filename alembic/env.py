@@ -1,6 +1,7 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config
+from sqlalchemy import pool
 
 from alembic import context
 
@@ -8,17 +9,23 @@ from alembic import context
 # access to the values within the .ini file in use.
 config = context.config
 
+# Set the database URL from settings
+from app.config import settings
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("+asyncpg", ""))
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-from app.models import cricket, user  # Import all models
-
 # add your model's MetaData object here
 # for 'autogenerate' support
 from app.utils.database import Base
-
+# Import all model modules to register tables
+import app.models.cricket
+import app.models.user
+import app.models.user_profile
+import app.models.scoring_integrity
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
@@ -59,7 +66,7 @@ def run_migrations_online() -> None:
 
     """
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
+        config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

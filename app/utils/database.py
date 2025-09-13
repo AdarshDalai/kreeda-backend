@@ -8,29 +8,41 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Create async engine
-engine = create_async_engine(
-    settings.database_url,
-    echo=settings.debug,
-    future=True,
-)
-
-# Create session factory
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
-
 # Create base class for models
 Base = declarative_base()
 metadata = MetaData()
+
+# Engine and session will be created when needed
+engine = None
+AsyncSessionLocal = None
+
+
+def get_engine():
+    global engine
+    if engine is None:
+        engine = create_async_engine(
+            settings.database_url,
+            echo=settings.debug,
+            future=True,
+        )
+    return engine
+
+
+def get_session_local():
+    global AsyncSessionLocal
+    if AsyncSessionLocal is None:
+        AsyncSessionLocal = async_sessionmaker(
+            get_engine(),
+            class_=AsyncSession,
+            expire_on_commit=False,
+        )
+    return AsyncSessionLocal
 
 
 async def init_db():
     """Initialize database tables"""
     try:
-        async with engine.begin() as conn:
+        async with get_engine().begin() as conn:
             # Import all models to register them with Base
             from app.models import cricket, user  # noqa: F401
 
@@ -42,9 +54,11 @@ async def init_db():
         raise
 
 
-async def get_db() -> AsyncSession:
+from typing import AsyncGenerator
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Get database session"""
-    async with AsyncSessionLocal() as session:
+    async with get_session_local()() as session:
         try:
             yield session
         finally:
