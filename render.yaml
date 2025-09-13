@@ -13,4 +13,58 @@ services:
         value: "false"
       - key: PYTHON_VERSION
         value: "3.11.12"
+      - key: APP_NAME
+        value: "Kreeda Backend"
+      - key: APP_VERSION
+        value: "0.1.0"
+      - key: PORT
+        value: "8000"
+      - key: API_V1_STR
+        value: "/api/v1"
+      - key: PROJECT_NAME
+        value: "Kreeda API"
+      - key: PROJECT_VERSION
+        value: "1.0.0"
+      - key: DATABASE_URL
+        value: "postgresql://postgres.hcybfjqkuhkjnoiddfzd:fafrix-rUhbem-cicda2@aws-1-ap-south-1.pooler.supabase.com:5432/postgres"
+      - key: SUPABASE_URL
+        value: "https://hcybfjqkuhkjnoiddfzd.supabase.co"
+      - key: SUPABASE_ANON_KEY
+        value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjeWJmanFrdWhram5vaWRkZnpkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3OTY4MTUsImV4cCI6MjA3MTM3MjgxNX0.OfC_dAzNYopjsDF0jGfVVacqYqAZSlOufMKSaYRGKyQ"
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjeWJmanFrdWhram5vaWRkZnpkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTc5NjgxNSwiZXhwIjoyMDcxMzcyODE1fQ.gKIlUKZeOuJcdd8uPSLksjAVyYXT06AYMJUpc2LqVy8"
+      - key: R2_ACCESS_KEY_ID
+        value: "95b1609c47f61c1e4dabe740dd0ea288"
+      - key: R2_SECRET_ACCESS_KEY
+        value: "e754301c2617246272713d591ed260811b3acfcd220b3c1e986673ab3924a750"
+      - key: R2_ACCOUNT_ID
+        value: "ec5af40e2a27c16a2b609a2c3c180273"
+      - key: R2_BUCKET_NAME
+        value: "kreeda-backend"
+      - key: R2_ENDPOINT_URL
+        value: "https://ec5af40e2a27c16a2b609a2c3c180273.r2.cloudflarestorage.com"
+      - key: REDIS_URL
+        value: "https://crisp-drake-50211.upstash.io"
+      - key: UPSTASH_REDIS_URL
+        value: "https://crisp-drake-50211.upstash.io"
+      - key: UPSTASH_REDIS_TOKEN
+        value: "AcQjAAIncDE1ZDA4M2Q0ZjY3ZTQ0YTVlOWEzMDc3MDZhZTBjM2M0NXAxNTAyMTE"
+      - key: SECRET_KEY
+        value: "IEAhEaudoFGmN5JX5NOwuvjSvGcNAju3wtGDXMo0+LC+syDmIQe3trF9xjgnMA+rEz4CaZflyc9hqCI2IyWzVg=="
+      - key: JWT_SECRET_KEY
+        value: "IEAhEaudoFGmN5JX5NOwuvjSvGcNAju3wtGDXMo0+LC+syDmIQe3trF9xjgnMA+rEz4CaZflyc9hqCI2IyWzVg=="
+      - key: JWT_ALGORITHM
+        value: "HS256"
+      - key: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: JWT_REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+      - key: BACKEND_CORS_ORIGINS
+        value: '["https://kreeda.cloudsbay.com"]'
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: LOG_FORMAT
+        value: "json"
+      - key: WS_HEARTBEAT_INTERVAL
+        value: "30"
 
