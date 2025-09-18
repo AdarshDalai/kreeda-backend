@@ -155,3 +155,17 @@ kreeda_copilot_prompt.md
 openapi_spec.json
 .gitignore
 .gitignore
+create_match_response.json
+create_team_response.json
+create_team2_response.json
+get_user_response.json
+kreeda_openApi.json
+kreeda-test-env.json
+KreedaAPI_PostmanCollection.json
+login_response.json
+newman-results.json
+node.pkg
+README.md
+register_response.json
+test-avatar.png
+test-results.json

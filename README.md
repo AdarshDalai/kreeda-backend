@@ -2,49 +2,55 @@
 
 Digital Cricket Scorekeeping Platform - Backend API built with FastAPI.
 
-## MVP Features
+## Overview
 
-- ✅ User Authentication (Supabase Integration)
-- ✅ Team Management  
-- ✅ Cricket Match Creation
-- ✅ Ball-by-Ball Scoring
-- ✅ Real-time Scorecard Updates
-- ✅ Match History
+Kreeda Backend API is a comprehensive cricket match management system that allows users to create teams, schedule matches, record ball-by-ball scoring, and generate real-time scorecards. It serves as the backend for a digital cricket scorekeeping platform, providing both REST API endpoints and WebSocket connections for live updates.
+
+## Key Features
+
+- User Authentication (Supabase Integration)
+- Team Management and Player Rosters
+- Cricket Match Creation and Scheduling
+- Ball-by-Ball Scoring with Detailed Statistics
+- Real-time Scorecard Updates via WebSockets
+- Match History and Player Statistics
+- Data Integrity Validation
 
 ## Tech Stack
 
-- **FastAPI 0.104+** - Modern Python web framework
-- **PostgreSQL 15+** - Primary database
-- **SQLAlchemy 2.0** - Async ORM
-- **Supabase** - Authentication service
-- **Redis** - Caching and pub/sub
-- **Cloudflare R2** - File storage
-- **WebSockets** - Real-time updates
+- **FastAPI** - Modern, high-performance Python web framework
+- **PostgreSQL** - Primary relational database
+- **SQLAlchemy 2.0** - Asynchronous ORM for database operations
+- **Supabase** - Authentication service integration
+- **Redis** - Caching and pub/sub for real-time updates
+- **Cloudflare R2** - Object storage for file uploads
+- **WebSockets** - Real-time bidirectional communication
 
-## Quick Start
-
-### Prerequisites
+## Prerequisites
 
 - Python 3.11+
 - PostgreSQL 15+
 - Redis 7+
 - Docker & Docker Compose (recommended)
 
-### Development Setup
+## Development Setup
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd kreeda-backend
    ```
 
 2. **Environment Setup**
+
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
    ```
 
 3. **Using Docker (Recommended)**
+
    ```bash
    # Start all services
    docker-compose up -d
@@ -57,6 +63,7 @@ Digital Cricket Scorekeeping Platform - Backend API built with FastAPI.
    ```
 
 4. **Manual Setup**
+
    ```bash
    # Create virtual environment
    python -m venv .venv
@@ -72,17 +79,19 @@ Digital Cricket Scorekeeping Platform - Backend API built with FastAPI.
    uvicorn app.main:app --reload
    ```
 
-### API Documentation
+## API Documentation
 
 Once running, visit:
-- **API Docs**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc  
-- **Health Check**: http://localhost:8000/health
+
+- **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+- **Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
 
 ## API Endpoints
 
 ### Authentication
-```
+
+```text
 POST /api/v1/auth/register    # User registration
 POST /api/v1/auth/login       # User login
 GET  /api/v1/auth/me          # Current user info
@@ -90,7 +99,8 @@ POST /api/v1/auth/refresh     # Refresh token
 ```
 
 ### Teams
-```
+
+```text
 GET    /api/v1/teams/                    # List user teams
 POST   /api/v1/teams/                    # Create team
 GET    /api/v1/teams/{id}                # Get team details
@@ -99,7 +109,8 @@ DELETE /api/v1/teams/{id}/members/{uid}  # Remove member
 ```
 
 ### Cricket Matches
-```
+
+```text
 GET  /api/v1/matches/              # List matches
 POST /api/v1/matches/              # Create match
 GET  /api/v1/matches/{id}          # Match details
@@ -110,7 +121,8 @@ POST /api/v1/matches/{id}/complete # Complete match
 ```
 
 ### WebSocket
-```
+
+```text
 WS /api/v1/matches/{id}/live       # Live score updates
 ```
 
@@ -144,17 +156,21 @@ ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
 ## Database Setup
 
 ### Using Docker
+
 The docker-compose.yml includes PostgreSQL setup. No manual configuration needed.
 
 ### Manual Setup
+
 1. Install PostgreSQL 15+
-2. Create database:
+
    ```sql
    CREATE DATABASE kreeda_dev;
    CREATE USER kreeda WITH PASSWORD 'password';
    GRANT ALL PRIVILEGES ON DATABASE kreeda_dev TO kreeda;
    ```
-3. Run migrations:
+
+2. Run migrations:
+
    ```bash
    alembic upgrade head
    ```
@@ -176,62 +192,69 @@ pytest tests/test_auth.py -v
 
 ```
 kreeda-backend/
-├── app/
-│   ├── main.py              # FastAPI app
-│   ├── config.py            # Configuration
-│   ├── auth/                # Authentication
-│   ├── models/              # Database models
-│   ├── schemas/             # API schemas
-│   ├── api/                 # Route handlers
-│   ├── services/            # Business logic
-│   └── utils/               # Utilities
-├── alembic/                 # Database migrations
-├── tests/                   # Test cases
-├── docker-compose.yml       # Docker setup
-├── requirements.txt         # Dependencies
-└── README.md               # This file
+├── app/                   # Main application package
+│   ├── main.py            # FastAPI application entry point
+│   ├── config.py          # Configuration and settings
+│   ├── api/               # API route handlers
+│   ├── auth/              # Authentication modules
+│   ├── models/            # SQLAlchemy database models
+│   ├── schemas/           # Pydantic data validation schemas
+│   ├── services/          # Business logic services
+│   └── utils/             # Utility functions and helpers
+├── alembic/               # Database migrations
+│   └── versions/          # Migration scripts
+├── tests/                 # Test cases
+├── docker-compose.yml     # Docker Compose configuration
+├── Dockerfile             # Docker build configuration
+├── requirements.txt       # Python dependencies
+└── README.md              # Project documentation
 ```
 
 ## Deployment
 
-### Using Docker
+### Containerized Deployment
 
 1. Build production image:
+
    ```bash
-   docker build -t kreeda-backend .
+   docker build -t kreeda-backend:latest .
    ```
 
-2. Run with environment:
+2. Run with environment variables:
+
    ```bash
-   docker run -p 8000:8000 --env-file .env kreeda-backend
+   docker run -p 8000:8000 --env-file .env kreeda-backend:latest
    ```
 
-### Traditional Deployment
+### Standard Deployment
 
 1. Install dependencies:
+
    ```bash
    pip install -r requirements.txt
    ```
 
 2. Run migrations:
+
    ```bash
    alembic upgrade head
    ```
 
 3. Start with Gunicorn:
+
    ```bash
    gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker
    ```
 
-## Development
+## Development Workflow
 
 ### Adding New Features
 
-1. Create models in `app/models/`
-2. Create schemas in `app/schemas/`
+1. Create database models in `app/models/`
+2. Define data schemas in `app/schemas/`
 3. Implement service logic in `app/services/`
 4. Create API routes in `app/api/`
-5. Add routes to `app/main.py`
+5. Register routes in `app/main.py`
 6. Create/run migrations with Alembic
 7. Write tests in `tests/`
 
@@ -266,4 +289,4 @@ For support, email your-support-email or join our Discord community.
 
 ---
 
-**Built with ❤️ for Cricket Lovers**
+Created for Cricket Lovers
