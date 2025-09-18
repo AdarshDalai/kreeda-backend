@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, EmailStr
 
 from app.schemas.user import UserResponse
 
@@ -22,6 +22,30 @@ class TeamUpdate(BaseModel):
     short_name: Optional[str] = Field(None, min_length=1, max_length=10)
     logo_url: Optional[str] = None
     captain_id: Optional[uuid.UUID] = None
+
+
+# Team Invitation Schemas
+class TeamInvitationCreate(BaseModel):
+    email: EmailStr
+    phone: Optional[str] = Field(None, pattern=r'^\+?[\d\s\-\(\)]+$')
+    message: Optional[str] = Field(None, max_length=500)
+
+
+class TeamInvitationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: uuid.UUID
+    email: str
+    phone: Optional[str]
+    status: str
+    message: Optional[str]
+    expires_at: datetime
+    created_at: datetime
+    invited_by: UserResponse
+
+
+class TeamJoinRequest(BaseModel):
+    message: Optional[str] = Field(None, max_length=500)
 
 
 class TeamMemberResponse(BaseModel):
@@ -45,6 +69,15 @@ class TeamResponse(TeamBase):
     creator: UserResponse
     captain: UserResponse
     members: List[TeamMemberResponse] = []
+
+
+class TeamSimpleResponse(TeamBase):
+    """Simplified team response for discovery/listing"""
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: uuid.UUID
+    created_at: datetime
+    is_active: bool
 
 
 class TeamMemberAdd(BaseModel):

@@ -1,31 +1,35 @@
 import logging
+import secrets
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.auth.middleware import get_current_active_user
-from app.models.user import Team, TeamMember, User
-from app.schemas.team import TeamCreate, TeamMemberResponse
+from app.auth.permissions import require_team_permission
+from app.models.user import Team, TeamInvitation, TeamMember, User
+from app.schemas.team import (
+    TeamCreate, 
+    TeamInvitationCreate, 
+    TeamInvitationResponse,
+    TeamJoinRequest,
+    TeamMemberResponse, 
+    TeamSimpleResponse
+)
 from app.utils.database import get_db
-
-
-# Simple response schema without relationships to avoid async issues
-class TeamSimpleResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    name: str
-    short_name: str
-    logo_url: Optional[str] = None
-    created_by_id: uuid.UUID
-    captain_id: uuid.UUID
-    created_at: datetime
-    is_active: bool
+from app.utils.error_handler import (
+    APIError, 
+    AlreadyExistsError, 
+    InternalServerError,
+    PermissionDeniedError,
+    TeamNotFoundError,
+    ValidationError
+)
 
 
 logger = logging.getLogger(__name__)
@@ -89,12 +93,13 @@ async def get_user_teams(
 ):
     """Get all teams for current user"""
     try:
-        # Get teams where user is a member
+        # Get teams where user is a member with optimized query
         result = await db.execute(
             select(Team)
             .join(TeamMember)
             .where(TeamMember.user_id == current_user.id)
             .where(Team.is_active == True)
+            .order_by(Team.created_at.desc())
         )
         teams = result.scalars().all()
 
@@ -102,10 +107,7 @@ async def get_user_teams(
 
     except Exception as e:
         logger.error(f"Failed to get user teams: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve teams",
-        )
+        raise InternalServerError("retrieve teams")
 
 
 @router.get("/{team_id}", response_model=TeamSimpleResponse)
@@ -116,32 +118,15 @@ async def get_team(
 ):
     """Get specific team details"""
     try:
-        # Check if user is member of the team
-        result = await db.execute(
-            select(Team)
-            .join(TeamMember)
-            .where(Team.id == team_id)
-            .where(TeamMember.user_id == current_user.id)
-            .where(Team.is_active == True)
-        )
-        team = result.scalar_one_or_none()
-
-        if not team:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Team not found or access denied",
-            )
-
+        # Check permission and get team
+        team = await require_team_permission(current_user, str(team_id), "view", db)
         return team
 
-    except HTTPException:
+    except APIError:
         raise
     except Exception as e:
         logger.error(f"Failed to get team: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve team",
-        )
+        raise InternalServerError("retrieve team")
 
 
 @router.get("/{team_id}/members", response_model=List[TeamMemberResponse])
@@ -152,33 +137,25 @@ async def get_team_members(
 ):
     """Get all members of a team"""
     try:
-        # Check if user is member of the team
+        # Check permission using helper
+        await require_team_permission(current_user, str(team_id), "view", db)
+
+        # Get all team members with eager loading to avoid N+1 queries
         result = await db.execute(
             select(TeamMember)
+            .options(selectinload(TeamMember.user))
             .where(TeamMember.team_id == team_id)
-            .where(TeamMember.user_id == current_user.id)
-        )
-        if not result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
-            )
-
-        # Get all team members
-        result = await db.execute(
-            select(TeamMember).join(User).where(TeamMember.team_id == team_id)
+            .order_by(TeamMember.joined_at)
         )
         members = result.scalars().all()
 
         return members
 
-    except HTTPException:
+    except APIError:
         raise
     except Exception as e:
         logger.error(f"Failed to get team members: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve team members",
-        )
+        raise InternalServerError("retrieve team members")
 
 
 @router.post("/{team_id}/join")
@@ -187,7 +164,7 @@ async def join_team(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Join an existing team"""
+    """Join an existing team (deprecated - use invitation system instead)"""
     try:
         # Check if team exists
         result = await db.execute(
@@ -196,9 +173,7 @@ async def join_team(
         team = result.scalar_one_or_none()
 
         if not team:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Team not found"
-            )
+            raise TeamNotFoundError(str(team_id))
 
         # Check if already a member
         result = await db.execute(
@@ -207,10 +182,7 @@ async def join_team(
             .where(TeamMember.user_id == current_user.id)
         )
         if result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Already a member of this team",
-            )
+            raise AlreadyExistsError("team membership")
 
         # Add as team member
         team_member = TeamMember(
@@ -221,17 +193,14 @@ async def join_team(
         await db.commit()
 
         logger.info(f"User {current_user.username} joined team {team.name}")
-        return {"message": "Successfully joined team"}
+        return {"success": True, "message": "Successfully joined team"}
 
-    except HTTPException:
+    except APIError:
         raise
     except Exception as e:
         logger.error(f"Failed to join team: {e}")
         await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to join team",
-        )
+        raise InternalServerError("join team")
 
 
 @router.delete("/{team_id}")
@@ -273,3 +242,276 @@ async def delete_team(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete team",
         )
+
+
+# Team Invitation Endpoints
+@router.post("/{team_id}/invite")
+async def invite_to_team(
+    team_id: uuid.UUID,
+    invitation_data: TeamInvitationCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Invite users to join team (only captain can invite)"""
+    try:
+        # Check permission using helper
+        team = await require_team_permission(current_user, str(team_id), "manage", db)
+        
+        # Check if user already invited or is member
+        existing_invite = await db.execute(
+            select(TeamInvitation)
+            .where(TeamInvitation.team_id == team_id)
+            .where(TeamInvitation.email == invitation_data.email)
+            .where(TeamInvitation.status == "pending")
+        )
+        
+        if existing_invite.scalar_one_or_none():
+            raise AlreadyExistsError("pending invitation", invitation_data.email)
+        
+        # Check if user is already a member
+        existing_member = await db.execute(
+            select(User)
+            .join(TeamMember)
+            .where(User.email == invitation_data.email)
+            .where(TeamMember.team_id == team_id)
+        )
+        
+        if existing_member.scalar_one_or_none():
+            raise AlreadyExistsError("team membership", invitation_data.email)
+        
+        # Generate secure token
+        invitation_token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(days=7)
+        
+        # Create invitation
+        invitation = TeamInvitation(
+            team_id=team_id,
+            invited_by_id=current_user.id,
+            email=invitation_data.email,
+            phone=invitation_data.phone,
+            message=invitation_data.message,
+            token=invitation_token,
+            expires_at=expires_at
+        )
+        
+        db.add(invitation)
+        await db.commit()
+        await db.refresh(invitation)
+        
+        # TODO: Send email/SMS notification 
+        # await notification_service.send_team_invitation(invitation)
+        
+        logger.info(f"Team invitation sent: {team.name} -> {invitation_data.email}")
+        
+        return {
+            "success": True,
+            "message": "Invitation sent successfully",
+            "invitation_id": invitation.id,
+            "expires_at": expires_at,
+            "invitation_token": invitation_token  # For testing purposes
+        }
+        
+    except APIError:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to send invitation: {e}")
+        await db.rollback()
+        raise InternalServerError("send invitation")
+
+
+@router.get("/{team_id}/invitations", response_model=List[TeamInvitationResponse])
+async def get_team_invitations(
+    team_id: uuid.UUID,
+    status_filter: Optional[str] = Query(None, alias="status", pattern="^(pending|accepted|rejected|expired)$"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get team invitations (only captain can view)"""
+    try:
+        # Check permission
+        await require_team_permission(current_user, str(team_id), "manage", db)
+        
+        # Build query
+        query = select(TeamInvitation).where(TeamInvitation.team_id == team_id)
+        if status_filter:
+            query = query.where(TeamInvitation.status == status_filter)
+        
+        query = query.order_by(TeamInvitation.created_at.desc())
+        
+        result = await db.execute(query.options(selectinload(TeamInvitation.invited_by)))
+        invitations = result.scalars().all()
+        
+        return invitations
+        
+    except APIError:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get invitations: {e}")
+        raise InternalServerError("retrieve invitations")
+
+
+@router.post("/join/{invitation_token}")
+async def accept_invitation(
+    invitation_token: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Accept team invitation using token"""
+    try:
+        # Find invitation
+        result = await db.execute(
+            select(TeamInvitation)
+            .where(TeamInvitation.token == invitation_token)
+            .where(TeamInvitation.status == "pending")
+            .where(TeamInvitation.expires_at > datetime.utcnow())
+            .options(selectinload(TeamInvitation.team))
+        )
+        invitation = result.scalar_one_or_none()
+        
+        if not invitation:
+            raise ValidationError("invitation_token", "Invitation not found or expired")
+        
+        # Verify email matches (optional security check)
+        if str(invitation.email) != str(current_user.email):
+            raise PermissionDeniedError("accept this invitation - email mismatch")
+        
+        # Check if already member
+        existing_member = await db.execute(
+            select(TeamMember)
+            .where(TeamMember.team_id == invitation.team_id)
+            .where(TeamMember.user_id == current_user.id)
+        )
+        
+        if existing_member.scalar_one_or_none():
+            raise AlreadyExistsError("team membership")
+        
+        # Add as team member
+        team_member = TeamMember(
+            team_id=invitation.team_id,
+            user_id=current_user.id,
+            role="player"
+        )
+        
+        # Update invitation status using update query
+        await db.execute(
+            update(TeamInvitation)
+            .where(TeamInvitation.id == invitation.id)
+            .values(
+                status="accepted",
+                updated_at=datetime.utcnow()
+            )
+        )
+        
+        db.add(team_member)
+        await db.commit()
+        
+        logger.info(f"User {current_user.username} joined team {invitation.team.name}")
+        
+        return {
+            "success": True,
+            "message": f"Successfully joined {invitation.team.name}",
+            "team": {
+                "id": invitation.team.id,
+                "name": invitation.team.name,
+                "short_name": invitation.team.short_name
+            }
+        }
+        
+    except APIError:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to accept invitation: {e}")
+        await db.rollback()
+        raise InternalServerError("join team")
+
+
+@router.get("/discover", response_model=List[TeamSimpleResponse])
+async def discover_teams(
+    search: Optional[str] = Query(None, min_length=2, max_length=50),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Discover public teams to join"""
+    try:
+        query = select(Team).where(Team.is_active == True)
+        
+        # Search filter
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.where(
+                Team.name.ilike(search_pattern) | 
+                Team.short_name.ilike(search_pattern)
+            )
+        
+        # Exclude teams user is already member of
+        user_teams_subquery = select(TeamMember.team_id).where(
+            TeamMember.user_id == current_user.id
+        )
+        query = query.where(~Team.id.in_(user_teams_subquery))
+        
+        # Order and paginate
+        query = query.order_by(Team.created_at.desc()).offset(offset).limit(limit)
+        
+        result = await db.execute(query)
+        teams = result.scalars().all()
+        
+        return teams
+        
+    except Exception as e:
+        logger.error(f"Failed to discover teams: {e}")
+        raise InternalServerError("discover teams")
+
+
+@router.post("/{team_id}/join-request")
+async def request_to_join_team(
+    team_id: uuid.UUID,
+    request_data: TeamJoinRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Send join request to team captain"""
+    try:
+        # Check team exists
+        result = await db.execute(
+            select(Team).where(Team.id == team_id).where(Team.is_active == True)
+        )
+        team = result.scalar_one_or_none()
+        
+        if not team:
+            raise TeamNotFoundError(str(team_id))
+        
+        # Check not already member
+        existing_member = await db.execute(
+            select(TeamMember)
+            .where(TeamMember.team_id == team_id)
+            .where(TeamMember.user_id == current_user.id)
+        )
+        
+        if existing_member.scalar_one_or_none():
+            raise AlreadyExistsError("team membership")
+        
+        # For now, auto-accept join requests (can be enhanced later with approval system)
+        team_member = TeamMember(
+            team_id=team_id,
+            user_id=current_user.id,
+            role="player"
+        )
+        
+        db.add(team_member)
+        await db.commit()
+        
+        logger.info(f"User {current_user.username} joined team {team.name}")
+        
+        return {
+            "success": True,
+            "message": f"Successfully joined {team.name}"
+        }
+        
+    except APIError:
+        raise
+    except Exception as e:
+        logger.error(f"Failed join request: {e}")
+        await db.rollback()
+        raise InternalServerError("process join request")

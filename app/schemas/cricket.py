@@ -31,6 +31,31 @@ class TossResult(BaseModel):
     toss_decision: str = Field(..., pattern="^(bat|bowl)$")
 
 
+# Playing XI Schemas
+class PlayingXIPlayer(BaseModel):
+    player_id: uuid.UUID
+    batting_order: Optional[int] = Field(None, ge=1, le=11)
+    is_captain: bool = False
+    is_wicket_keeper: bool = False
+
+
+class PlayingXISelection(BaseModel):
+    team_id: uuid.UUID
+    players: List[PlayingXIPlayer] = Field(..., min_length=11, max_length=11)
+
+
+class PlayingXIResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    match_id: uuid.UUID
+    team_id: uuid.UUID
+    player_id: uuid.UUID
+    batting_order: Optional[int]
+    is_captain: bool
+    is_wicket_keeper: bool
+    player: UserResponse
+
+
 class BallRecord(BaseModel):
     over_number: int = Field(..., ge=1)
     ball_number: int = Field(..., ge=1, le=10)  # Can be more due to extras
