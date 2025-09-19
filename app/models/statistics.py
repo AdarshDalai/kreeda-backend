@@ -72,7 +72,7 @@ class PlayerCareerStats(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
-    user = relationship("User", back_populates="career_stats")
+    user = relationship("User")  # Removed back_populates to fix relationship issue
     
     # Indexes for performance
     __table_args__ = (
