@@ -47,6 +47,7 @@ class User(Base):
     activity_logs = relationship("UserActivityLog", back_populates="user")
     sessions = relationship("UserSession", back_populates="user")
     achievements = relationship("UserAchievement", back_populates="user")
+    # career_stats = relationship("PlayerCareerStats", back_populates="user", uselist=False)
 
 
 class Team(Base):
