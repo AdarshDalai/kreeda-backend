@@ -10,6 +10,14 @@ from app.models.statistics import (
 )
 from app.models.tournament import Tournament, TournamentMatch, TournamentStanding, TournamentTeam
 from app.models.user import Team, TeamMember, User, TeamInvitation, MatchPlayingXI
+from app.models.notifications import (
+    Notification,
+    NotificationType,
+    NotificationPreference,
+    NotificationTemplate,
+    NotificationQueue,
+    UserDeviceToken,
+)
 
 __all__ = [
     "User",
@@ -30,4 +38,10 @@ __all__ = [
     "PlayerPerformanceTrend",
     "Leaderboard",
     "PlayerComparison",
+    "Notification",
+    "NotificationType",
+    "NotificationPreference",
+    "NotificationTemplate",
+    "NotificationQueue",
+    "UserDeviceToken",
 ]
