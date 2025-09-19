@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import auth, cricket, cricket_integrity, stats, teams, tournaments, user_profile, users
+from app.api import auth, cricket, cricket_integrity, stats, statistics, teams, tournaments, user_profile, users
 from app.config import settings
 from app.utils.database import init_db
 
@@ -103,6 +103,9 @@ app.include_router(
 )
 app.include_router(
     stats.router, prefix=f"{settings.api_v1_str}/stats", tags=["statistics"]
+)
+app.include_router(
+    statistics.router, prefix=f"{settings.api_v1_str}/statistics", tags=["analytics"]
 )
 app.include_router(
     tournaments.router, prefix=f"{settings.api_v1_str}/tournaments", tags=["tournaments"]

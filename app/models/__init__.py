@@ -1,5 +1,13 @@
 # Import all models to ensure they are registered with SQLAlchemy
 from app.models.cricket import CricketBall, CricketMatch, MatchPlayerStats
+from app.models.statistics import (
+    PlayerCareerStats,
+    PlayerMatchPerformance,
+    TeamSeasonStats,
+    PlayerPerformanceTrend,
+    Leaderboard,
+    PlayerComparison,
+)
 from app.models.tournament import Tournament, TournamentMatch, TournamentStanding, TournamentTeam
 from app.models.user import Team, TeamMember, User, TeamInvitation, MatchPlayingXI
 
@@ -16,4 +24,10 @@ __all__ = [
     "TournamentTeam",
     "TournamentMatch", 
     "TournamentStanding",
+    "PlayerCareerStats",
+    "PlayerMatchPerformance",
+    "TeamSeasonStats",
+    "PlayerPerformanceTrend",
+    "Leaderboard",
+    "PlayerComparison",
 ]
