@@ -3,6 +3,7 @@ Statistics API endpoints for player and team analytics
 Provides comprehensive performance tracking and leaderboards
 """
 import logging
+from datetime import datetime
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 
@@ -24,7 +25,17 @@ from app.utils.error_handler import APIError
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/statistics", tags=["statistics"])
+router = APIRouter(tags=["statistics"])
+
+
+@router.get("/health")
+async def statistics_health_check():
+    """Health check for statistics system"""
+    return {
+        "status": "healthy", 
+        "service": "statistics",
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 
 @router.get("/career/{user_id}", response_model=Optional[PlayerCareerStatsResponse])

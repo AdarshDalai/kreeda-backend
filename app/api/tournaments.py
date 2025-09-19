@@ -26,7 +26,7 @@ from app.utils.error_handler import APIError
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/tournaments", tags=["tournaments"])
+router = APIRouter(tags=["tournaments"])
 
 
 @router.post("/", response_model=TournamentResponse, status_code=status.HTTP_201_CREATED)
