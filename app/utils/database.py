@@ -44,7 +44,7 @@ async def init_db():
     try:
         async with get_engine().begin() as conn:
             # Import all models to register them with Base
-            from app.models import cricket, user  # noqa: F401
+            from app.models import cricket, user, statistics, tournament, notifications, user_profile, scoring_integrity  # noqa: F401
 
             # Create all tables
             await conn.run_sync(Base.metadata.create_all)
