@@ -1,0 +1,108 @@
+{
+    "id": "kreeda-api-test-environment",
+    "name": "Kreeda API - Clean Test Environment",
+    "values": [
+        {
+            "key": "base_url",
+            "value": "https://kreeda-backend-5dwv.onrender.com",
+            "description": "Base URL for the Kreeda API",
+            "enabled": true
+        },
+        {
+            "key": "access_token",
+            "value": "",
+            "description": "Bearer token for authenticated requests - will be set automatically after login",
+            "enabled": true
+        },
+        {
+            "key": "refresh_token", 
+            "value": "",
+            "description": "Refresh token for token renewal",
+            "enabled": true
+        },
+        {
+            "key": "user_id",
+            "value": "550e8400-e29b-41d4-a716-446655440000",
+            "description": "Test user ID for operations requiring user identification",
+            "enabled": true
+        },
+        {
+            "key": "team_id",
+            "value": "550e8400-e29b-41d4-a716-446655440001",
+            "description": "Test team ID for team-related operations",
+            "enabled": true
+        },
+        {
+            "key": "match_id",
+            "value": "550e8400-e29b-41d4-a716-446655440002",
+            "description": "Test match ID for cricket match operations",
+            "enabled": true
+        },
+        {
+            "key": "tournament_id",
+            "value": "550e8400-e29b-41d4-a716-446655440003",
+            "description": "Test tournament ID for tournament operations",
+            "enabled": true
+        },
+        {
+            "key": "player_id",
+            "value": "550e8400-e29b-41d4-a716-446655440004",
+            "description": "Test player ID for player-related operations",
+            "enabled": true
+        },
+        {
+            "key": "ball_id",
+            "value": "550e8400-e29b-41d4-a716-446655440005",
+            "description": "Test ball ID for scoring operations",
+            "enabled": true
+        },
+        {
+            "key": "over_id",
+            "value": "550e8400-e29b-41d4-a716-446655440006",
+            "description": "Test over ID for cricket scoring",
+            "enabled": true
+        },
+        {
+            "key": "innings_id",
+            "value": "550e8400-e29b-41d4-a716-446655440007",
+            "description": "Test innings ID for match progression",
+            "enabled": true
+        },
+        {
+            "key": "notification_id",
+            "value": "550e8400-e29b-41d4-a716-446655440008",
+            "description": "Test notification ID for notification operations",
+            "enabled": true
+        },
+        {
+            "key": "invitation_id",
+            "value": "550e8400-e29b-41d4-a716-446655440009",
+            "description": "Test invitation ID for team invitations",
+            "enabled": true
+        },
+        {
+            "key": "test_email",
+            "value": "newman.test.user@example.com",
+            "description": "Fresh test email for workflow simulation",
+            "enabled": true
+        },
+        {
+            "key": "test_password",
+            "value": "SecurePassword123!",
+            "description": "Test password for authentication workflow",
+            "enabled": true
+        },
+        {
+            "key": "test_username",
+            "value": "newman_test_user_2025",
+            "description": "Fresh username for user workflow simulation",
+            "enabled": true
+        },
+        {
+            "key": "full_name",
+            "value": "Newman Test User",
+            "description": "Full name for user profile",
+            "enabled": true
+        }
+    ]
+}

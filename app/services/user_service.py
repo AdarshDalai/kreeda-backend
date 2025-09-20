@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, or_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -390,3 +390,84 @@ class UserService:
             logger.error(f"Error syncing user with Supabase: {e}")
             await db.rollback()
             raise Exception(f"Failed to sync user: {str(e)}")
+
+    @staticmethod
+    async def get_user_count(
+        db: AsyncSession, 
+        search: Optional[str] = None, 
+        is_active: Optional[bool] = None
+    ) -> int:
+        """
+        Get total count of users with optional filters
+
+        Args:
+            db: Database session
+            search: Search term for username, full name, or email
+            is_active: Filter by active status
+
+        Returns:
+            Total count of users matching filters
+        """
+        try:
+            query = select(func.count(User.id))
+            
+            if search:
+                search_filter = or_(
+                    User.username.ilike(f"%{search}%"),
+                    User.full_name.ilike(f"%{search}%"),
+                    User.email.ilike(f"%{search}%")
+                )
+                query = query.where(search_filter)
+            
+            if is_active is not None:
+                query = query.where(User.is_active == is_active)
+            
+            result = await db.execute(query)
+            count = result.scalar_one()
+            
+            logger.info(f"User count query returned: {count}")
+            return count
+
+        except Exception as e:
+            logger.error(f"Error getting user count: {e}")
+            raise Exception(f"Failed to get user count: {str(e)}")
+
+    @staticmethod
+    async def search_users_by_username(
+        db: AsyncSession, 
+        username_query: str, 
+        limit: int = 10
+    ) -> List[User]:
+        """
+        Search users by username for autocomplete
+
+        Args:
+            db: Database session
+            username_query: Search query for username
+            limit: Maximum number of results
+
+        Returns:
+            List of users matching the search query
+        """
+        try:
+            query = (
+                select(User)
+                .where(
+                    and_(
+                        User.username.ilike(f"%{username_query}%"),
+                        User.is_active == True
+                    )
+                )
+                .limit(limit)
+                .order_by(User.username)
+            )
+            
+            result = await db.execute(query)
+            users = result.scalars().all()
+            
+            logger.info(f"Username search returned {len(users)} results for query: {username_query}")
+            return list(users)
+
+        except Exception as e:
+            logger.error(f"Error searching users by username: {e}")
+            raise Exception(f"Failed to search users: {str(e)}")

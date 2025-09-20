@@ -170,9 +170,8 @@ async def update_user(
         # Update user
         updated_user = await UserService.update_user(
             db=db,
-            user_id=user_id,
-            user_data=user_update,
-            update_supabase=update_supabase,
+            user=existing_user,
+            user_update=user_update,
         )
 
         if not updated_user:
@@ -222,19 +221,23 @@ async def delete_user(
             )
 
         if hard_delete:
-            success = await UserService.hard_delete_user(
-                db=db, user_id=user_id, delete_from_supabase=delete_from_supabase
-            )
+            success = await UserService.hard_delete_user(db=db, user=existing_user)
             message = "User permanently deleted"
+            
+            if not success:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to delete user",
+                )
         else:
-            success = await UserService.delete_user(db=db, user_id=user_id)
+            deleted_user = await UserService.soft_delete_user(db=db, user=existing_user)
             message = "User deactivated"
-
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to delete user",
-            )
+            
+            if not deleted_user:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to delete user",
+                )
 
         return {"message": message}
     except HTTPException:
