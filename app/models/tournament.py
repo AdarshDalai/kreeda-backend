@@ -84,7 +84,7 @@ class TournamentTeam(Base):
     # Relationships
     tournament = relationship("Tournament", back_populates="teams")
     team = relationship("Team")
-    registered_by = relationship("User")
+    registered_by = relationship("User", foreign_keys=[registered_by_id])
 
 
 class TournamentMatch(Base):

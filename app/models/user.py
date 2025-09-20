@@ -134,4 +134,4 @@ class MatchPlayingXI(Base):
     # Relationships
     match = relationship("CricketMatch")
     team = relationship("Team")
-    player = relationship("User")
+    player = relationship("User", foreign_keys=[player_id])

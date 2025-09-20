@@ -201,5 +201,5 @@ class MatchPlayerStats(Base):
 
     # Relationships
     match = relationship("CricketMatch", back_populates="player_stats")
-    player = relationship("User")
+    player = relationship("User", foreign_keys=[player_id])
     team = relationship("Team")
