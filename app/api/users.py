@@ -204,6 +204,7 @@ async def delete_user(
     current_user: User = Depends(get_current_active_user),
 ):
     """Delete user (soft delete by default, hard delete optional)"""
+    # Fixed method signature issues - v2
     try:
         # Check if user exists
         existing_user = await UserService.get_user_by_id(db=db, user_id=user_id)
