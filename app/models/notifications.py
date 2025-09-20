@@ -130,7 +130,7 @@ class NotificationPreference(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # Relationships
-    notification_type: Mapped["NotificationType"] = relationship("NotificationPreference", back_populates="user_preferences")
+    notification_type: Mapped["NotificationType"] = relationship("NotificationType", back_populates="user_preferences")
 
 
 class NotificationTemplate(Base):
