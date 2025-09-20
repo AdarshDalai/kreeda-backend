@@ -157,7 +157,7 @@ class StatisticsService:
                     WITH player_stats AS (
                         SELECT 
                             u.id as user_id,
-                            u.name,
+                            u.full_name as name,
                             COUNT(*) as matches,
                             SUM(mp.runs_scored) as total_runs,
                             SUM(CASE WHEN mp.dismissal_type IS NOT NULL THEN 1 ELSE 0 END) as dismissals
@@ -165,7 +165,7 @@ class StatisticsService:
                         JOIN match_player_stats mp ON u.id = mp.user_id
                         JOIN cricket_matches cm ON mp.match_id = cm.id
                         WHERE cm.status = 'completed'
-                        GROUP BY u.id, u.name
+                        GROUP BY u.id, u.full_name
                         HAVING COUNT(*) >= :min_matches AND SUM(CASE WHEN mp.dismissal_type IS NOT NULL THEN 1 ELSE 0 END) > 0
                     )
                     SELECT 
@@ -184,14 +184,14 @@ class StatisticsService:
                 query = text("""
                     SELECT 
                         u.id as user_id,
-                        u.name,
+                        u.full_name as name,
                         COUNT(*) as matches,
                         SUM(mp.runs_scored) as total_runs
                     FROM users u
                     JOIN match_player_stats mp ON u.id = mp.user_id
                     JOIN cricket_matches cm ON mp.match_id = cm.id
                     WHERE cm.status = 'completed'
-                    GROUP BY u.id, u.name
+                    GROUP BY u.id, u.full_name
                     HAVING COUNT(*) >= :min_matches
                     ORDER BY total_runs DESC
                     LIMIT :limit
@@ -201,14 +201,14 @@ class StatisticsService:
                 query = text("""
                     SELECT 
                         u.id as user_id,
-                        u.name,
+                        u.full_name as name,
                         COUNT(*) as matches,
                         SUM(mp.wickets_taken) as total_wickets
                     FROM users u
                     JOIN match_player_stats mp ON u.id = mp.user_id
                     JOIN cricket_matches cm ON mp.match_id = cm.id
                     WHERE cm.status = 'completed'
-                    GROUP BY u.id, u.name
+                    GROUP BY u.id, u.full_name
                     HAVING COUNT(*) >= :min_matches
                     ORDER BY total_wickets DESC
                     LIMIT :limit

@@ -47,10 +47,10 @@ async def create_tournament(
             max_teams=tournament.max_teams,
             min_teams=tournament.min_teams,
             entry_fee=tournament.entry_fee or Decimal("0"),
-            prize_pool=tournament.prize_money,
+            prize_money=tournament.prize_money,
             description=tournament.description,
             rules=None,  # Not in schema
-            venue=tournament.venue_details,
+            venue_details=tournament.venue_details,
         )
         return TournamentResponse.from_orm(created_tournament)
     except APIError as e:

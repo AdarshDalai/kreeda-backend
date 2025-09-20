@@ -449,7 +449,13 @@ async def discover_teams(
         user_teams_subquery = select(TeamMember.team_id).where(
             TeamMember.user_id == current_user.id
         )
-        query = query.where(~Team.id.in_(user_teams_subquery))
+        
+        # Execute subquery to get actual team IDs
+        user_teams_result = await db.execute(user_teams_subquery)
+        user_team_ids = [row[0] for row in user_teams_result.fetchall()]
+        
+        if user_team_ids:
+            query = query.where(~Team.id.in_(user_team_ids))
         
         # Order and paginate
         query = query.order_by(Team.created_at.desc()).offset(offset).limit(limit)

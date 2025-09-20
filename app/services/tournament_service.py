@@ -40,10 +40,10 @@ class TournamentService:
         max_teams: int = 16,
         min_teams: int = 4,
         entry_fee: Decimal = Decimal("0"),
-        prize_pool: Optional[Decimal] = None,
+        prize_money: Optional[Decimal] = None,
         description: Optional[str] = None,
         rules: Optional[str] = None,
-        venue: Optional[str] = None,
+        venue_details: Optional[str] = None,
     ) -> Tournament:
         """Create a new tournament"""
         try:
@@ -56,10 +56,10 @@ class TournamentService:
                 max_teams=max_teams,
                 min_teams=min_teams,
                 entry_fee=entry_fee,
-                prize_pool=prize_pool,
+                prize_money=prize_money,
                 description=description,
                 rules=rules,
-                venue=venue,
+                venue_details=venue_details,
                 status="upcoming"
             )
             
