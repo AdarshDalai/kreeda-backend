@@ -2,7 +2,6 @@ import logging
 from typing import Any, Dict, Optional
 
 from supabase.client import Client, create_client
-from supabase.lib.client_options import ClientOptions
 
 from app.config import settings
 
@@ -22,7 +21,11 @@ def get_supabase_client() -> Optional[Client]:
             return None
 
         try:
-            supabase = create_client(settings.supabase_url, settings.supabase_anon_key)
+            # Initialize Supabase client without any additional options that might cause issues
+            supabase = create_client(
+                settings.supabase_url, 
+                settings.supabase_anon_key
+            )
             logger.info("Supabase client initialized")
         except Exception as e:
             logger.error(f"Failed to initialize Supabase client: {e}")
@@ -40,10 +43,10 @@ def get_supabase_admin_client() -> Optional[Client]:
             return None
 
         try:
+            # Initialize admin client with minimal options to avoid proxy issues
             admin_supabase = create_client(
                 settings.supabase_url,
-                settings.supabase_service_role_key,
-                options=ClientOptions(auto_refresh_token=False, persist_session=False),
+                settings.supabase_service_role_key
             )
             logger.info("Supabase admin client initialized")
         except Exception as e:
