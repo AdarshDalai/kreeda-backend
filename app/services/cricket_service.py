@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Any, Dict
+import uuid
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,7 +30,7 @@ class CricketService:
             async with self.db.begin():
                 # Get fresh match data within transaction
                 result = await self.db.execute(
-                    select(CricketMatch).where(CricketMatch.id == match_id)
+                    select(CricketMatch).where(CricketMatch.id == uuid.UUID(match_id))
                 )
                 match = result.scalar_one_or_none()
 
@@ -40,7 +41,7 @@ class CricketService:
                 balls_count_result = await self.db.execute(
                     select(CricketBall)
                     .where(
-                        CricketBall.match_id == match_id,
+                        CricketBall.match_id == uuid.UUID(match_id),
                         CricketBall.innings == match.current_innings,
                         CricketBall.ball_type == "legal",
                     )
@@ -250,7 +251,7 @@ class CricketService:
         try:
             # Get match
             result = await self.db.execute(
-                select(CricketMatch).where(CricketMatch.id == match_id)
+                select(CricketMatch).where(CricketMatch.id == uuid.UUID(match_id))
             )
             match = result.scalar_one_or_none()
 

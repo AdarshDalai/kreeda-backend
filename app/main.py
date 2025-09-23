@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, WebSocket
@@ -19,7 +20,11 @@ async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
     logger.info("Starting up Kreeda API...")
-    await init_db()
+    
+    # Skip database initialization during testing
+    if not os.getenv("TESTING", "false").lower() == "true":
+        await init_db()
+    
     yield
     # Shutdown
     logger.info("Shutting down Kreeda API...")

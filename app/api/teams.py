@@ -19,7 +19,8 @@ from app.schemas.team import (
     TeamInvitationResponse,
     TeamJoinRequest,
     TeamMemberResponse, 
-    TeamSimpleResponse
+    TeamSimpleResponse,
+    TeamUpdate
 )
 from app.utils.database import get_db
 from app.utils.error_handler import (
@@ -50,6 +51,16 @@ async def create_team(
 ):
     """Create a new cricket team"""
     try:
+        # Check for duplicate team name
+        existing_team = await db.execute(
+            select(Team).where(
+                Team.name == team_data.name,
+                Team.is_active == True
+            )
+        )
+        if existing_team.scalar_one_or_none():
+            raise AlreadyExistsError("team name", team_data.name)
+        
         # Create new team
         new_team = Team(
             name=team_data.name,
@@ -77,6 +88,10 @@ async def create_team(
         logger.info(f"Team created: {new_team.name} by {current_user.username}")
         return new_team
 
+    except APIError:
+        # Let APIErrors (including AlreadyExistsError) bubble up
+        await db.rollback()
+        raise
     except Exception as e:
         logger.error(f"Failed to create team: {e}")
         await db.rollback()
@@ -127,6 +142,51 @@ async def get_team(
     except Exception as e:
         logger.error(f"Failed to get team: {e}")
         raise InternalServerError("retrieve team")
+
+
+@router.put("/{team_id}", response_model=TeamSimpleResponse)
+async def update_team(
+    team_id: uuid.UUID,
+    team_data: TeamUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Update team details (only captain can update)"""
+    try:
+        # Check permission and get team
+        team = await require_team_permission(current_user, str(team_id), "manage", db)
+        
+        # Build update values - only include non-None values
+        update_values = {}
+        if team_data.name is not None:
+            update_values["name"] = team_data.name
+        if team_data.short_name is not None:
+            update_values["short_name"] = team_data.short_name
+        if team_data.logo_url is not None:
+            update_values["logo_url"] = team_data.logo_url
+        if team_data.captain_id is not None:
+            update_values["captain_id"] = team_data.captain_id
+        
+        # Only update if there are changes
+        if update_values:
+            await db.execute(
+                update(Team)
+                .where(Team.id == team_id)
+                .values(**update_values)
+            )
+        
+        await db.commit()
+        await db.refresh(team)
+        
+        logger.info(f"Team updated: {team.name} by {current_user.username}")
+        return team
+
+    except APIError:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update team: {e}")
+        await db.rollback()
+        raise InternalServerError("update team")
 
 
 @router.get("/{team_id}/members", response_model=List[TeamMemberResponse])
@@ -423,6 +483,46 @@ async def accept_invitation(
         logger.error(f"Failed to accept invitation: {e}")
         await db.rollback()
         raise InternalServerError("join team")
+
+
+# Alternative invitation endpoints for test compatibility
+@router.post("/{team_id}/invitations")
+async def invite_to_team_alt(
+    team_id: uuid.UUID,
+    invitation_data: TeamInvitationCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Alternative endpoint for team invitations (compatibility)"""
+    return await invite_to_team(team_id, invitation_data, db, current_user)
+
+
+@router.get("/invitations/received", response_model=List[TeamInvitationResponse])
+async def get_user_invitations(
+    status_filter: Optional[str] = Query(None, alias="status", pattern="^(pending|accepted|rejected|expired)$"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get invitations received by current user"""
+    try:
+        # Build query
+        query = select(TeamInvitation).where(TeamInvitation.email == current_user.email)
+        if status_filter:
+            query = query.where(TeamInvitation.status == status_filter)
+        
+        query = query.order_by(TeamInvitation.created_at.desc())
+        
+        result = await db.execute(query.options(
+            selectinload(TeamInvitation.team),
+            selectinload(TeamInvitation.invited_by)
+        ))
+        invitations = result.scalars().all()
+        
+        return invitations
+        
+    except Exception as e:
+        logger.error(f"Failed to get user invitations: {e}")
+        raise InternalServerError("retrieve user invitations")
 
 
 @router.get("/discover", response_model=List[TeamSimpleResponse])

@@ -21,7 +21,7 @@ from app.schemas.statistics import (
 )
 from app.services.statistics_service import StatisticsService
 from app.utils.database import get_db
-from app.utils.error_handler import APIError
+from app.utils.error_handler import APIError, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +88,46 @@ async def update_player_career_stats(
         )
 
 
+@router.get("/players/performance")
+async def get_players_performance(
+    match_type: Optional[str] = Query(None),
+    venue: Optional[str] = Query(None),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get player performance statistics with filtering and pagination"""
+    try:
+        service = StatisticsService(db)
+        
+        # For now, return the current user's match history with filters
+        # This could be extended to return all players' performance
+        match_history = await service.get_player_match_history(
+            user_id=str(current_user.id),
+            limit=limit
+        )
+        
+        return {
+            "players": match_history,
+            "total": len(match_history),
+            "skip": skip,
+            "limit": limit
+        }
+        
+    except APIError as e:
+        logger.error(f"API error getting player performance: {e}")
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+    except Exception as e:
+        logger.error(f"Unexpected error getting player performance: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get player performance"
+        )
+
+
 @router.get("/leaderboard/{category}")
 async def get_leaderboard(
     category: str,
@@ -115,9 +155,9 @@ async def get_leaderboard(
             "entries": leaderboard
         }
         
-    except APIError as e:
-        logger.error(f"API error getting leaderboard: {e}")
-        raise HTTPException(status_code=e.status_code, detail=e.detail)
+    except HTTPException:
+        # Re-raise HTTPExceptions (including ValidationError and APIError) as-is
+        raise
     except Exception as e:
         logger.error(f"Unexpected error getting leaderboard: {e}")
         raise HTTPException(
@@ -153,6 +193,30 @@ async def get_player_match_history(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get match history"
+        )
+
+
+@router.get("/teams/rankings")
+async def get_team_rankings(
+    sport: Optional[str] = Query(default=None),
+    limit: int = Query(default=10),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get team rankings based on performance metrics"""
+    try:
+        service = StatisticsService(db)
+        rankings = await service.get_team_rankings(sport=sport, limit=limit)
+        
+        return rankings
+        
+    except APIError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+    except Exception as e:
+        logger.error(f"Unexpected error getting team rankings: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get team rankings"
         )
 
 

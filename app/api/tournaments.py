@@ -15,7 +15,9 @@ from app.models.tournament import Tournament
 from app.models.user import User
 from app.schemas.tournament import (
     TournamentCreate,
+    TournamentUpdate,
     TournamentResponse,
+    TournamentSummaryResponse,
     TournamentTeamRegistration,
     TournamentTeamResponse,
     TournamentStandingResponse,
@@ -29,7 +31,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["tournaments"])
 
 
-@router.post("/", response_model=TournamentResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=TournamentSummaryResponse, status_code=status.HTTP_201_CREATED)
 async def create_tournament(
     tournament: TournamentCreate,
     current_user: User = Depends(get_current_user),
@@ -52,7 +54,7 @@ async def create_tournament(
             rules=None,  # Not in schema
             venue_details=tournament.venue_details,
         )
-        return TournamentResponse.from_orm(created_tournament)
+        return TournamentSummaryResponse.model_validate(created_tournament)
     except APIError as e:
         logger.error(f"API error creating tournament: {e}")
         raise HTTPException(status_code=e.status_code, detail=e.detail)
@@ -61,6 +63,117 @@ async def create_tournament(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create tournament"
+        )
+
+
+@router.get("/", response_model=List[TournamentSummaryResponse])
+async def get_tournaments(
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get list of tournaments"""
+    try:
+        service = TournamentService(db)
+        tournaments = await service.get_tournaments(skip=skip, limit=limit)
+        return [TournamentSummaryResponse.model_validate(tournament) for tournament in tournaments]
+    except Exception as e:
+        logger.error(f"Unexpected error getting tournaments: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get tournaments"
+        )
+
+
+@router.get("/{tournament_id}", response_model=TournamentSummaryResponse)
+async def get_tournament_by_id(
+    tournament_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get tournament by ID"""
+    try:
+        service = TournamentService(db)
+        tournament = await service.get_tournament_by_id(tournament_id)
+        if not tournament:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tournament not found"
+            )
+        return TournamentSummaryResponse.model_validate(tournament)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error getting tournament: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get tournament"
+        )
+
+
+@router.put("/{tournament_id}", response_model=TournamentSummaryResponse)
+async def update_tournament(
+    tournament_id: str,
+    tournament_update: TournamentUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update tournament details"""
+    try:
+        service = TournamentService(db)
+        
+        # Convert update data to dict, excluding None values
+        update_data = tournament_update.model_dump(exclude_none=True)
+        
+        updated_tournament = await service.update_tournament(
+            tournament_id=tournament_id,
+            updates=update_data,
+            updated_by_id=str(current_user.id)
+        )
+        
+        if not updated_tournament:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tournament not found"
+            )
+            
+        return TournamentSummaryResponse.model_validate(updated_tournament)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error updating tournament: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update tournament"
+        )
+
+
+@router.delete("/{tournament_id}")
+async def delete_tournament(
+    tournament_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete tournament"""
+    try:
+        service = TournamentService(db)
+        success = await service.delete_tournament(tournament_id)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tournament not found"
+            )
+            
+        return {"message": "Tournament deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error deleting tournament: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete tournament"
         )
 
 

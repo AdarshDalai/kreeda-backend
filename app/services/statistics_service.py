@@ -37,10 +37,17 @@ class StatisticsService:
     async def get_player_career_stats(self, user_id: str) -> Optional[PlayerCareerStats]:
         """Get comprehensive career statistics for a player"""
         try:
+            # Convert string user_id to UUID
+            try:
+                user_uuid = uuid.UUID(user_id)
+            except ValueError:
+                # Invalid UUID format, return None (user not found)
+                return None
+                
             result = await self.db.execute(
                 select(PlayerCareerStats)
                 .options(selectinload(PlayerCareerStats.user))
-                .where(PlayerCareerStats.user_id == user_id)
+                .where(PlayerCareerStats.user_id == user_uuid)
             )
             return result.scalar_one_or_none()
         except Exception as e:
@@ -50,7 +57,13 @@ class StatisticsService:
     async def create_initial_career_stats(self, user_id: str) -> PlayerCareerStats:
         """Create initial career statistics for a new player"""
         try:
-            career_stats = PlayerCareerStats(user_id=user_id)
+            # Convert string user_id to UUID
+            try:
+                user_uuid = uuid.UUID(user_id)
+            except ValueError:
+                raise ValidationError("user_id", "Invalid UUID format")
+                
+            career_stats = PlayerCareerStats(user_id=user_uuid)
             self.db.add(career_stats)
             await self.db.commit()
             await self.db.refresh(career_stats)
@@ -63,45 +76,39 @@ class StatisticsService:
     async def calculate_career_stats_from_matches(self, user_id: str) -> Dict[str, Any]:
         """Calculate career statistics directly from match data using SQL aggregation"""
         try:
-            # Use raw SQL for reliable aggregation
+            # Use raw SQL for reliable aggregation with correct column names
             query = text("""
                 WITH player_matches AS (
                     SELECT 
-                        mp.runs_scored,
+                        mp.batting_runs,
                         mp.balls_faced,
                         mp.fours_hit,
                         mp.sixes_hit,
                         mp.wickets_taken,
                         mp.overs_bowled,
                         mp.runs_conceded,
-                        mp.catches_taken,
-                        mp.stumpings_made,
-                        mp.run_outs_effected,
-                        CASE WHEN mp.runs_scored IS NOT NULL THEN 1 ELSE 0 END as batted,
-                        CASE WHEN mp.wickets_taken IS NOT NULL THEN 1 ELSE 0 END as bowled,
-                        CASE WHEN mp.dismissal_type IS NOT NULL THEN 1 ELSE 0 END as out
+                        mp.is_out,
+                        CASE WHEN mp.batting_runs IS NOT NULL THEN 1 ELSE 0 END as batted,
+                        CASE WHEN mp.wickets_taken IS NOT NULL THEN 1 ELSE 0 END as bowled
                     FROM match_player_stats mp
                     JOIN cricket_matches cm ON mp.match_id = cm.id
-                    WHERE mp.user_id = :user_id
+                    WHERE mp.player_id = :user_id
                     AND cm.status = 'completed'
                 )
                 SELECT 
                     COUNT(*) as total_matches,
                     SUM(CASE WHEN batted = 1 THEN 1 ELSE 0 END) as innings_batted,
-                    COALESCE(SUM(runs_scored), 0) as total_runs,
-                    COALESCE(MAX(runs_scored), 0) as highest_score,
+                    COALESCE(SUM(batting_runs), 0) as total_runs,
+                    COALESCE(MAX(batting_runs), 0) as highest_score,
                     COALESCE(SUM(balls_faced), 0) as total_balls_faced,
                     COALESCE(SUM(fours_hit), 0) as total_fours,
                     COALESCE(SUM(sixes_hit), 0) as total_sixes,
-                    SUM(CASE WHEN out = 1 THEN 1 ELSE 0 END) as times_out,
-                    SUM(CASE WHEN batted = 1 AND out = 0 THEN 1 ELSE 0 END) as times_not_out,
+                    SUM(CASE WHEN is_out = true THEN 1 ELSE 0 END) as times_out,
+                    SUM(CASE WHEN batted = 1 AND is_out = false THEN 1 ELSE 0 END) as times_not_out,
                     SUM(CASE WHEN bowled = 1 THEN 1 ELSE 0 END) as innings_bowled,
                     COALESCE(SUM(overs_bowled), 0) as total_overs_bowled,
                     COALESCE(SUM(runs_conceded), 0) as total_runs_conceded,
-                    COALESCE(SUM(wickets_taken), 0) as total_wickets,
-                    COALESCE(SUM(catches_taken), 0) as total_catches,
-                    COALESCE(SUM(stumpings_made), 0) as total_stumpings,
-                    COALESCE(SUM(run_outs_effected), 0) as total_run_outs
+                    COALESCE(SUM(wickets_taken), 0) as total_wickets
                 FROM player_matches
             """)
             
@@ -159,14 +166,14 @@ class StatisticsService:
                             u.id as user_id,
                             u.full_name as name,
                             COUNT(*) as matches,
-                            SUM(mp.runs_scored) as total_runs,
-                            SUM(CASE WHEN mp.dismissal_type IS NOT NULL THEN 1 ELSE 0 END) as dismissals
+                            SUM(mp.batting_runs) as total_runs,
+                            SUM(CASE WHEN mp.is_out = true THEN 1 ELSE 0 END) as dismissals
                         FROM users u
-                        JOIN match_player_stats mp ON u.id = mp.user_id
+                        JOIN match_player_stats mp ON u.id = mp.player_id
                         JOIN cricket_matches cm ON mp.match_id = cm.id
                         WHERE cm.status = 'completed'
                         GROUP BY u.id, u.full_name
-                        HAVING COUNT(*) >= :min_matches AND SUM(CASE WHEN mp.dismissal_type IS NOT NULL THEN 1 ELSE 0 END) > 0
+                        HAVING COUNT(*) >= :min_matches AND SUM(CASE WHEN mp.is_out = true THEN 1 ELSE 0 END) > 0
                     )
                     SELECT 
                         user_id,
@@ -174,7 +181,10 @@ class StatisticsService:
                         matches,
                         total_runs,
                         dismissals,
-                        ROUND(total_runs::numeric / dismissals, 2) as batting_average
+                        CASE 
+                            WHEN dismissals > 0 THEN ROUND(CAST(total_runs AS FLOAT) / dismissals, 2)
+                            ELSE 0
+                        END as batting_average
                     FROM player_stats
                     ORDER BY batting_average DESC
                     LIMIT :limit
@@ -186,9 +196,9 @@ class StatisticsService:
                         u.id as user_id,
                         u.full_name as name,
                         COUNT(*) as matches,
-                        SUM(mp.runs_scored) as total_runs
+                        SUM(mp.batting_runs) as total_runs
                     FROM users u
-                    JOIN match_player_stats mp ON u.id = mp.user_id
+                    JOIN match_player_stats mp ON u.id = mp.player_id
                     JOIN cricket_matches cm ON mp.match_id = cm.id
                     WHERE cm.status = 'completed'
                     GROUP BY u.id, u.full_name
@@ -205,7 +215,7 @@ class StatisticsService:
                         COUNT(*) as matches,
                         SUM(mp.wickets_taken) as total_wickets
                     FROM users u
-                    JOIN match_player_stats mp ON u.id = mp.user_id
+                    JOIN match_player_stats mp ON u.id = mp.player_id
                     JOIN cricket_matches cm ON mp.match_id = cm.id
                     WHERE cm.status = 'completed'
                     GROUP BY u.id, u.full_name
@@ -255,7 +265,7 @@ class StatisticsService:
                 JOIN teams t2 ON cm.team_b_id = t2.id
                 LEFT JOIN tournament_matches tm ON cm.id = tm.match_id
                 LEFT JOIN tournaments tour ON tm.tournament_id = tour.id
-                WHERE mp.user_id = :user_id
+                WHERE mp.player_id = :user_id
                 AND cm.status = 'completed'
             """
             
@@ -309,7 +319,7 @@ class StatisticsService:
                     FROM cricket_matches cm
                     WHERE (cm.team_a_id = :team_id OR cm.team_b_id = :team_id)
                     AND cm.status = 'completed'
-                    AND EXTRACT(YEAR FROM cm.match_date) = :season_year
+                    AND CAST(strftime('%Y', cm.match_date) AS INTEGER) = :season_year
                 )
                 SELECT 
                     COUNT(*) as matches_played,
@@ -320,7 +330,7 @@ class StatisticsService:
                     MAX(team_score) as highest_score,
                     MIN(team_score) as lowest_score,
                     CASE 
-                        WHEN COUNT(*) > 0 THEN ROUND((SUM(won)::numeric / COUNT(*)) * 100, 2)
+                        WHEN COUNT(*) > 0 THEN ROUND((CAST(SUM(won) AS FLOAT) / COUNT(*)) * 100, 2)
                         ELSE 0
                     END as win_percentage
                 FROM team_matches
@@ -348,18 +358,18 @@ class StatisticsService:
             query = text("""
                 SELECT 
                     u.id as user_id,
-                    u.name,
+                    u.full_name as name,
                     COUNT(DISTINCT cm.id) as matches,
-                    SUM(mp.runs_scored) as total_runs,
+                    SUM(mp.batting_runs) as total_runs,
                     SUM(mp.wickets_taken) as total_wickets,
-                    AVG(mp.runs_scored) as avg_runs_per_match
+                    AVG(mp.batting_runs) as avg_runs_per_match
                 FROM users u
-                JOIN match_player_stats mp ON u.id = mp.user_id
+                JOIN match_player_stats mp ON u.id = mp.player_id
                 JOIN cricket_matches cm ON mp.match_id = cm.id
                 JOIN tournament_matches tm ON cm.id = tm.match_id
                 WHERE tm.tournament_id = :tournament_id
                 AND cm.status = 'completed'
-                GROUP BY u.id, u.name
+                GROUP BY u.id, u.full_name
                 ORDER BY total_runs DESC
                 LIMIT 20
             """)
@@ -494,3 +504,82 @@ class StatisticsService:
             logger.error(f"Error updating career stats: {e}")
             await self.db.rollback()
             raise InternalServerError("update career stats")
+
+    async def get_team_rankings(
+        self,
+        sport: Optional[str] = None,
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """Get team rankings based on performance metrics"""
+        try:
+            # Build base query for team rankings
+            # Note: Teams table doesn't have sport column, so we ignore sport filter for now
+            base_query = """
+                WITH team_stats AS (
+                    SELECT 
+                        t.id,
+                        t.name,
+                        COUNT(DISTINCT CASE 
+                            WHEN cm.team_a_id = t.id OR cm.team_b_id = t.id 
+                            THEN cm.id 
+                        END) as total_matches,
+                        COUNT(DISTINCT CASE 
+                            WHEN (cm.team_a_id = t.id AND cm.team_a_score > cm.team_b_score) 
+                                OR (cm.team_b_id = t.id AND cm.team_b_score > cm.team_a_score)
+                            THEN cm.id 
+                        END) as wins,
+                        COUNT(DISTINCT CASE 
+                            WHEN (cm.team_a_id = t.id AND cm.team_a_score < cm.team_b_score) 
+                                OR (cm.team_b_id = t.id AND cm.team_b_score < cm.team_a_score)
+                            THEN cm.id 
+                        END) as losses
+                    FROM teams t
+                    LEFT JOIN cricket_matches cm ON (
+                        (cm.team_a_id = t.id OR cm.team_b_id = t.id) 
+                        AND cm.status = 'completed'
+                    )
+                    WHERE t.is_active = true
+                    GROUP BY t.id, t.name
+                )
+                SELECT 
+                    id,
+                    name,
+                    total_matches,
+                    wins,
+                    losses,
+                    (total_matches - wins - losses) as draws,
+                    CASE 
+                        WHEN total_matches > 0 THEN ROUND((CAST(wins AS FLOAT) / total_matches) * 100, 2)
+                        ELSE 0
+                    END as win_percentage,
+                    (wins * 2 + (total_matches - wins - losses)) as points
+                FROM team_stats
+                ORDER BY points DESC, win_percentage DESC, total_matches DESC
+                LIMIT :limit
+            """
+            
+            params = {"limit": limit}
+                
+            result = await self.db.execute(text(base_query), params)
+            rows = result.fetchall()
+            
+            rankings = []
+            for i, row in enumerate(rows, 1):
+                rankings.append({
+                    "rank": i,
+                    "team_id": str(row.id),
+                    "team_name": row.name,
+                    "sport": "cricket",  # Default to cricket since we only have cricket matches
+                    "total_matches": row.total_matches,
+                    "wins": row.wins,
+                    "losses": row.losses,
+                    "draws": row.draws,
+                    "win_percentage": row.win_percentage,
+                    "points": row.points
+                })
+            
+            return rankings
+            
+        except Exception as e:
+            logger.error(f"Error getting team rankings: {e}")
+            raise InternalServerError("get team rankings")

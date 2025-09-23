@@ -22,7 +22,7 @@ from app.services.user_profile_service import UserProfileService
 from app.utils.database import get_db
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/profile", tags=["User Profile"])
+router = APIRouter(tags=["User Profile"])
 security = HTTPBearer()
 
 
@@ -31,9 +31,10 @@ async def get_profile(
     current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """Get complete user profile with all settings"""
+    user_id = str(current_user.id)  # Capture user ID early to avoid lazy loading issues
     try:
         profile = await UserProfileService.get_complete_profile(
-            db, str(current_user.id)
+            db, user_id
         )
 
         if not profile:
@@ -44,7 +45,7 @@ async def get_profile(
         return profile
 
     except Exception as e:
-        logger.error(f"Error getting profile for user {current_user.id}: {e}")
+        logger.error(f"Error getting profile for user {user_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get profile",
@@ -58,9 +59,10 @@ async def update_profile(
     db: AsyncSession = Depends(get_db),
 ):
     """Update user profile information"""
+    user_id = str(current_user.id)  # Capture user ID early to avoid lazy loading issues
     try:
         updated_user = await UserProfileService.update_profile(
-            db, str(current_user.id), profile_update
+            db, user_id, profile_update
         )
 
         if not updated_user:
@@ -70,30 +72,31 @@ async def update_profile(
 
         # Get complete profile
         profile = await UserProfileService.get_complete_profile(
-            db, str(current_user.id)
+            db, user_id
         )
         return profile
 
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Error updating profile for user {current_user.id}: {e}")
+        logger.error(f"Error updating profile for user {user_id}: {type(e).__name__}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update profile",
+            detail=f"Failed to update profile: {type(e).__name__}",
         )
 
 
-@router.post("/avatar")
+@router.post("/upload-avatar")
 async def upload_avatar(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Upload and set user avatar"""
+    user_id = str(current_user.id)  # Capture user ID early to avoid lazy loading issues
     try:
         avatar_url = await UserProfileService.upload_avatar(
-            db, str(current_user.id), file
+            db, user_id, file
         )
 
         return {"message": "Avatar uploaded successfully", "avatar_url": avatar_url}
@@ -101,10 +104,37 @@ async def upload_avatar(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Error uploading avatar for user {current_user.id}: {e}")
+        logger.error(f"Error uploading avatar for user {user_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to upload avatar",
+        )
+
+
+@router.get("/privacy")
+async def get_privacy_settings(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get user privacy settings"""
+    user_id = str(current_user.id)
+    try:
+        profile = await UserProfileService.get_complete_profile(db, user_id)
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User profile not found",
+            )
+        
+        return {
+            "privacy_settings": profile.privacy_settings or {}
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting privacy settings for user {user_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get privacy settings",
         )
 
 
@@ -115,9 +145,10 @@ async def update_privacy_settings(
     db: AsyncSession = Depends(get_db),
 ):
     """Update user privacy settings"""
+    user_id = str(current_user.id)  # Capture user ID early to avoid lazy loading issues
     try:
         success = await UserProfileService.update_privacy_settings(
-            db, str(current_user.id), privacy_settings
+            db, user_id, privacy_settings
         )
 
         if not success:
@@ -129,7 +160,7 @@ async def update_privacy_settings(
         return {"message": "Privacy settings updated successfully"}
 
     except Exception as e:
-        logger.error(f"Error updating privacy settings for user {current_user.id}: {e}")
+        logger.error(f"Error updating privacy settings for user {user_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update privacy settings",
@@ -143,9 +174,10 @@ async def update_notification_settings(
     db: AsyncSession = Depends(get_db),
 ):
     """Update user notification settings"""
+    user_id = str(current_user.id)  # Capture user ID early to avoid lazy loading issues
     try:
         success = await UserProfileService.update_notification_settings(
-            db, str(current_user.id), notification_settings
+            db, user_id, notification_settings
         )
 
         if not success:
@@ -158,7 +190,7 @@ async def update_notification_settings(
 
     except Exception as e:
         logger.error(
-            f"Error updating notification settings for user {current_user.id}: {e}"
+            f"Error updating notification settings for user {user_id}: {e}"
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -166,7 +198,7 @@ async def update_notification_settings(
         )
 
 
-@router.put("/password")
+@router.put("/change-password")
 async def change_password(
     password_change: UserPasswordChange,
     current_user: User = Depends(get_current_user),
@@ -174,12 +206,13 @@ async def change_password(
     authorization: HTTPAuthorizationCredentials = Depends(security),
 ):
     """Change user password"""
+    user_id = str(current_user.id)  # Capture user ID early to avoid lazy loading issues
     try:
         # Extract token from Authorization header
         access_token = authorization.credentials
 
         success = await UserProfileService.change_password(
-            db, str(current_user.id), password_change, access_token
+            db, user_id, password_change, access_token
         )
 
         if not success:
@@ -193,7 +226,7 @@ async def change_password(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Error changing password for user {current_user.id}: {e}")
+        logger.error(f"Error changing password for user {user_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to change password",
@@ -205,12 +238,13 @@ async def get_dashboard_stats(
     current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """Get user dashboard statistics"""
+    user_id = str(current_user.id)  # Capture user ID early to avoid lazy loading issues
     try:
-        stats = await UserProfileService.get_dashboard_stats(db, str(current_user.id))
+        stats = await UserProfileService.get_dashboard_stats(db, user_id)
         return stats
 
     except Exception as e:
-        logger.error(f"Error getting dashboard stats for user {current_user.id}: {e}")
+        logger.error(f"Error getting dashboard stats for user {user_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get dashboard stats",
@@ -225,15 +259,16 @@ async def get_activity_logs(
     db: AsyncSession = Depends(get_db),
 ):
     """Get user activity logs"""
+    user_id = str(current_user.id)  # Capture user ID early to avoid lazy loading issues
     try:
         logs = await UserProfileService.get_activity_logs(
-            db, str(current_user.id), limit, activity_type
+            db, user_id, limit, activity_type
         )
 
         return logs
 
     except Exception as e:
-        logger.error(f"Error getting activity logs for user {current_user.id}: {e}")
+        logger.error(f"Error getting activity logs for user {user_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get activity logs",
@@ -245,8 +280,9 @@ async def delete_account(
     current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """Soft delete user account (GDPR compliance)"""
+    user_id = str(current_user.id)  # Capture user ID early to avoid lazy loading issues
     try:
-        success = await UserProfileService.delete_account(db, str(current_user.id))
+        success = await UserProfileService.delete_account(db, user_id)
 
         if not success:
             raise HTTPException(
@@ -257,7 +293,7 @@ async def delete_account(
         return {"message": "Account deleted successfully"}
 
     except Exception as e:
-        logger.error(f"Error deleting account for user {current_user.id}: {e}")
+        logger.error(f"Error deleting account for user {user_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete account",
@@ -269,9 +305,10 @@ async def get_profile_completion(
     current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """Get profile completion percentage and suggestions"""
+    user_id = str(current_user.id)  # Capture user ID early to avoid lazy loading issues
     try:
         profile = await UserProfileService.get_complete_profile(
-            db, str(current_user.id)
+            db, user_id
         )
 
         if not profile:
@@ -322,7 +359,7 @@ async def get_profile_completion(
 
     except Exception as e:
         logger.error(
-            f"Error getting profile completion for user {current_user.id}: {e}"
+            f"Error getting profile completion for user {user_id}: {e}"
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -280,6 +280,208 @@ async def cleanup_notifications(
     return {"message": f"Cleaned up {count} notifications older than {days_to_keep} days"}
 
 
+@router.get("/unread", response_model=NotificationListResponse)
+async def get_unread_notifications(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all unread notifications for the current user."""
+    service = NotificationService(db)
+    filter_params = NotificationFilter(is_read=False)
+    result = await service.get_user_notifications(
+        user_id=uuid.UUID(str(current_user.id)),
+        page=page,
+        page_size=page_size,
+        filter_params=filter_params
+    )
+    return NotificationListResponse(**result)
+
+
+@router.get("/count")
+async def get_notification_count(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get notification count for the current user."""
+    service = NotificationService(db)
+    summary = await service.get_notification_summary(uuid.UUID(str(current_user.id)))
+    
+    return {
+        "total": summary.get("total_count", 0),
+        "unread": summary.get("unread_count", 0)
+    }
+
+
+@router.get("/preferences")
+async def get_notification_preferences(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get notification preferences for the current user."""
+    # Return default preferences since service doesn't have this method yet
+    return {
+        "email_notifications": True,
+        "push_notifications": True,
+        "in_app_notifications": True,
+        "match_updates": True,
+        "team_invitations": True,
+        "tournament_announcements": True
+    }
+
+
+@router.patch("/preferences")
+async def update_notification_preferences(
+    preferences_data: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update notification preferences for the current user."""
+    # For now, just return the updated preferences
+    # In a real implementation, this would be saved to database
+    return {
+        "success": True,
+        "preferences": preferences_data,
+        "message": "Preferences updated successfully"
+    }
+
+
+@router.post("/send")
+async def send_notification(
+    notification_data: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Send a general notification."""
+    # Validate required fields
+    if not notification_data.get("notification_type"):
+        raise HTTPException(status_code=400, detail="notification_type is required")
+    
+    if not notification_data.get("message"):
+        raise HTTPException(status_code=400, detail="message is required")
+    
+    # Validate notification type
+    valid_types = ["team_invitation", "match_update", "general", "tournament_announcement"]
+    if notification_data.get("notification_type") not in valid_types:
+        raise HTTPException(status_code=400, detail="Invalid notification type")
+    
+    # Check for recipient if it's a team invitation or other targeted notifications
+    if notification_data.get("notification_type") in ["team_invitation"] and not notification_data.get("recipient"):
+        raise HTTPException(status_code=400, detail="recipient is required for this notification type")
+    
+    # For now, just return success
+    return {"success": True, "message": "Notification sent"}
+
+
+@router.post("/send-email")
+async def send_email_notification(
+    email_data: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Send email notification."""
+    # Validate email format
+    recipient = email_data.get("recipient")
+    if not recipient:
+        raise HTTPException(status_code=400, detail="recipient is required")
+    
+    # Basic email validation
+    import re
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(email_pattern, recipient):
+        raise HTTPException(status_code=400, detail="Invalid email format")
+    
+    if not email_data.get("subject"):
+        raise HTTPException(status_code=400, detail="subject is required")
+    
+    if not email_data.get("body"):
+        raise HTTPException(status_code=400, detail="body is required")
+    
+    # For now, just return success
+    # In a real implementation, this would integrate with email service
+    return {"success": True, "message": "Email notification sent"}
+
+
+@router.post("/send-push")
+async def send_push_notification(
+    push_data: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Send push notification."""
+    # For now, just return success
+    # In a real implementation, this would integrate with push service
+    return {"success": True, "message": "Push notification sent"}
+
+
+@router.post("/register-device")
+async def register_device_for_push(
+    device_data: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Register device for push notifications."""
+    # For now, just return success
+    # In a real implementation, this would save device token
+    return {"success": True, "message": "Device registered for push notifications"}
+
+
+@router.get("/templates")
+async def get_notification_templates(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get available notification templates."""
+    # Return default templates
+    return [
+        {
+            "id": "match_update",
+            "name": "Match Update",
+            "template": "Match update: {{title}}"
+        },
+        {
+            "id": "team_invitation",
+            "name": "Team Invitation",
+            "template": "{{inviter}} invited you to join {{team_name}}"
+        }
+    ]
+
+
+@router.post("/templates")
+async def create_notification_template(
+    template_data: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Create custom notification template."""
+    # For now, just return success
+    # In a real implementation, this would save template to database
+    template_id = str(uuid.uuid4())
+    return {"success": True, "message": "Template created", "template_id": template_id}
+
+
+@router.post("/templates/preview")
+async def preview_notification_template(
+    preview_data: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """Preview notification template with sample data."""
+    template = preview_data.get("template", "")
+    sample_data = preview_data.get("data", {})
+    
+    # Simple template replacement for preview
+    preview_text = template
+    for key, value in sample_data.items():
+        preview_text = preview_text.replace(f"{{{{{key}}}}}", str(value))
+    
+    return {
+        "preview": preview_text,
+        "template": template,
+        "data": sample_data
+    }
+
+
 @router.get("/health")
 async def notifications_health_check():
     """

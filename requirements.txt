@@ -1,5 +1,5 @@
 # FastAPI Core
-fastapi
+fastapi==0.104.1
 uvicorn[standard]
 python-multipart
 
@@ -31,7 +31,7 @@ redis
 boto3  # For S3-compatible storage (Cloudflare R2)
 
 # HTTP Client
-httpx
+httpx>=0.24.0,<0.25.0
 
 # WebSockets
 websockets
@@ -43,5 +43,7 @@ structlog
 # Development
 pytest
 pytest-asyncio
+pytest-cov
+httpx>=0.24.0,<0.25.0
 black
 flake8

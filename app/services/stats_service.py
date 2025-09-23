@@ -10,6 +10,7 @@ import logging
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum
+import uuid
 
 from app.models.cricket import CricketMatch, CricketBall, MatchPlayerStats
 from app.models.user import User, Team
@@ -235,11 +236,17 @@ class CricketStatsEngine:
             raise ValueError("Team ID cannot be empty")
         
         try:
+            # Convert string team_id to UUID for database comparison
+            try:
+                team_uuid = uuid.UUID(team_id)
+            except ValueError:
+                raise ValueError(f"Invalid team ID format: {team_id}")
+            
             # Get basic team matches
             base_query = select(CricketMatch).where(
                 or_(
-                    CricketMatch.team_a_id == team_id,
-                    CricketMatch.team_b_id == team_id
+                    CricketMatch.team_a_id == team_uuid,
+                    CricketMatch.team_b_id == team_uuid
                 )
             )
             
@@ -254,11 +261,11 @@ class CricketStatsEngine:
             
             for match in matches:
                 # Calculate basic stats
-                if match.winner_team_id == team_id:
+                if match.winner_team_id and str(match.winner_team_id) == str(team_uuid):
                     wins += 1
                 
                 # Add runs scored and conceded
-                if str(match.team_a_id) == str(team_id):
+                if match.team_a_id == team_uuid:
                     total_runs_scored += match.team_a_score or 0
                     total_runs_conceded += match.team_b_score or 0
                 else:
@@ -287,7 +294,7 @@ class CricketStatsEngine:
             logger.error(f"Error calculating team stats for {team_id}: {e}")
             return {
                 "team_id": team_id,
-                "period": period.value,
+                "period": period.value if hasattr(period, 'value') else str(period),
                 "error": "Team statistics temporarily unavailable",
                 "last_updated": datetime.utcnow().isoformat()
             }
@@ -340,10 +347,16 @@ class CricketStatsEngine:
             raise ValueError("Invalid team ID or match count")
         
         try:
+            # Convert string team_id to UUID for database comparison
+            try:
+                team_uuid = uuid.UUID(team_id)
+            except ValueError:
+                raise ValueError(f"Invalid team ID format: {team_id}")
+            
             recent_matches_query = select(CricketMatch).where(
                 or_(
-                    CricketMatch.team_a_id == team_id,
-                    CricketMatch.team_b_id == team_id
+                    CricketMatch.team_a_id == team_uuid,
+                    CricketMatch.team_b_id == team_uuid
                 )
             ).order_by(CricketMatch.created_at.desc()).limit(last_n_matches)
             
@@ -361,7 +374,7 @@ class CricketStatsEngine:
                 team_score = 0
                 opponent_score = 0
                 
-                if str(match.team_a_id) == str(team_id):
+                if match.team_a_id == team_uuid:
                     team_score = match.team_a_score or 0
                     opponent_score = match.team_b_score or 0
                 else:
@@ -369,7 +382,7 @@ class CricketStatsEngine:
                     opponent_score = match.team_a_score or 0
                 
                 # Determine result
-                if match.winner_team_id and str(match.winner_team_id) == str(team_id):
+                if match.winner_team_id and match.winner_team_id == team_uuid:
                     form_string += "W"
                     recent_wins += 1
                     result = "win"

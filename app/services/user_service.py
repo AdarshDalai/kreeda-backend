@@ -1,4 +1,5 @@
 import logging
+import uuid
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import and_, or_, select, func
@@ -84,7 +85,14 @@ class UserService:
             User object or None
         """
         try:
-            result = await db.execute(select(User).where(User.id == user_id))
+            # Convert string ID to UUID for database query
+            try:
+                uuid_id = uuid.UUID(user_id)
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Invalid UUID format for user_id {user_id}: {e}")
+                return None
+                
+            result = await db.execute(select(User).where(User.id == uuid_id))
             user = result.scalar_one_or_none()
 
             if user:

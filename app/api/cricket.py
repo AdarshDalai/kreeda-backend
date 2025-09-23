@@ -41,7 +41,7 @@ async def cricket_health():
     return {"success": True, "message": "Cricket service healthy"}
 
 
-@router.post("/cricket", response_model=MatchResponseBasic)
+@router.post("/", response_model=MatchResponseBasic)
 async def create_match(
     match_data: CricketMatchCreate,
     db: AsyncSession = Depends(get_db),
@@ -75,7 +75,7 @@ async def create_match(
         )
 
 
-@router.get("/cricket", response_model=List[MatchResponseBasic])
+@router.get("/", response_model=List[MatchResponseBasic])
 async def get_matches(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -94,7 +94,7 @@ async def get_matches(
         raise InternalServerError("retrieve matches")
 
 
-@router.get("/cricket/{match_id}", response_model=MatchResponseBasic)
+@router.get("/{match_id}", response_model=MatchResponseBasic)
 async def get_match(
     match_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -113,7 +113,7 @@ async def get_match(
         raise InternalServerError("retrieve match")
 
 
-@router.post("/cricket/{match_id}/balls", response_model=BallResponse)
+@router.post("/{match_id}/balls", response_model=BallResponse)
 async def record_ball(
     match_id: uuid.UUID,
     ball_data: BallRecord,
@@ -122,16 +122,8 @@ async def record_ball(
 ):
     """Record a ball in the cricket match"""
     try:
-        # Get match
-        result = await db.execute(
-            select(CricketMatch).where(CricketMatch.id == match_id)
-        )
-        match = result.scalar_one_or_none()
-
-        if not match:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Match not found"
-            )
+        # Check permission to manage match
+        match = await require_match_permission(current_user, str(match_id), "manage", db)
 
         # Use cricket service to record ball
         cricket_service = CricketService(db)
@@ -140,16 +132,14 @@ async def record_ball(
         logger.info(f"Ball recorded in match {match_id}")
         return ball
 
+    except APIError:
+        raise
     except Exception as e:
         logger.error(f"Failed to record ball: {e}")
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to record ball",
-        )
+        raise InternalServerError("record ball")
 
 
-@router.get("/cricket/{match_id}/scorecard")
+@router.get("/{match_id}/scorecard")
 async def get_scorecard(
     match_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -185,7 +175,7 @@ async def get_scorecard(
 
 
 # Match Management Endpoints
-@router.post("/cricket/{match_id}/toss")
+@router.post("/{match_id}/toss")
 async def record_toss(
     match_id: uuid.UUID,
     toss_data: TossResult,
@@ -231,7 +221,7 @@ async def record_toss(
         raise InternalServerError("record toss")
 
 
-@router.put("/cricket/{match_id}")
+@router.put("/{match_id}")
 async def update_match(
     match_id: uuid.UUID,
     match_data: CricketMatchUpdate,
@@ -287,7 +277,7 @@ async def update_match(
         raise InternalServerError("update match")
 
 
-@router.delete("/cricket/{match_id}")
+@router.delete("/{match_id}")
 async def cancel_match(
     match_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -330,7 +320,7 @@ async def cancel_match(
 
 
 # Playing XI Management
-@router.post("/cricket/{match_id}/playing-xi")
+@router.post("/{match_id}/playing-xi")
 async def set_playing_xi(
     match_id: uuid.UUID,
     playing_xi: PlayingXISelection,
@@ -415,7 +405,7 @@ async def set_playing_xi(
         raise InternalServerError("set playing XI")
 
 
-@router.get("/cricket/{match_id}/playing-xi/{team_id}", response_model=List[PlayingXIResponse])
+@router.get("/{match_id}/playing-xi/{team_id}", response_model=List[PlayingXIResponse])
 async def get_playing_xi(
     match_id: uuid.UUID,
     team_id: uuid.UUID,
