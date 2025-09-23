@@ -17,7 +17,7 @@ bcrypt
 python-decouple
 
 # Supabase
-supabase==2.7.1
+supabase
 
 # Validation & Serialization
 pydantic
