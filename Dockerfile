@@ -25,20 +25,23 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Copy Python dependencies from builder stage
-COPY --from=builder /root/.local /root/.local
+# Create non-root user for security first
+RUN useradd --create-home --shell /bin/bash --uid 1000 appuser
+
+# Copy Python dependencies from builder stage to appuser's local directory
+COPY --from=builder /root/.local /home/appuser/.local
 
 # Copy application code
 COPY ./app ./app
 COPY ./alembic ./alembic
 COPY alembic.ini .
+COPY docker-entrypoint.sh .
 
-# Create non-root user for security
-RUN useradd --create-home --shell /bin/bash --uid 1000 appuser \
-    && chown -R appuser:appuser /app
+# Change ownership of everything to appuser
+RUN chown -R appuser:appuser /app /home/appuser/.local
 
-# Add local python packages to PATH
-ENV PATH=/root/.local/bin:$PATH
+# Add appuser's local python packages to PATH
+ENV PATH=/home/appuser/.local/bin:$PATH
 
 # Switch to non-root user
 USER appuser
@@ -51,4 +54,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 EXPOSE 8000
 
 # Use exec form for proper signal handling
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["./docker-entrypoint.sh"]
