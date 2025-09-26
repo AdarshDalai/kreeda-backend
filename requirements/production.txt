@@ -1,0 +1,11 @@
+# Include base requirements
+-r base.txt
+
+# Production ASGI Server
+gunicorn==21.2.0
+
+# Production monitoring
+prometheus-client==0.19.0
+
+# Production utilities
+structlog==23.2.0
