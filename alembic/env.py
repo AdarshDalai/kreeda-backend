@@ -61,8 +61,16 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    # Override URL from environment if available
+    from src.config.settings import settings
+    alembic_config = config.get_section(config.config_ini_section, {})
+    
+    # Convert async URL to sync URL for Alembic
+    db_url = settings.database_url.replace('+asyncpg', '')
+    alembic_config['sqlalchemy.url'] = db_url
+    
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        alembic_config,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

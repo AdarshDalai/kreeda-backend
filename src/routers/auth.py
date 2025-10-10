@@ -107,17 +107,15 @@ async def update_user(
     try:
         token = authorization.split(" ")[1]
         user = await AuthService.get_user_from_token(token, db)
-        # Note: This endpoint needs to be implemented in AuthService
-        raise HTTPException(status_code=501, detail="Update user not yet implemented")
+        return await AuthService.update_user(str(user.id), request, db)
     except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/recover", summary="Send password reset email")
 async def recover_password(request: PasswordResetRequest, db: AsyncSession = Depends(get_db)):
     """Send password reset email."""
     try:
-        # Note: This endpoint needs to be implemented in AuthService
-        raise HTTPException(status_code=501, detail="Password recovery not yet implemented")
+        return await AuthService.request_password_reset(request.email, db)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -125,7 +123,22 @@ async def recover_password(request: PasswordResetRequest, db: AsyncSession = Dep
 async def refresh_token(request: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
     """Refresh access token using refresh token."""
     try:
-        # Note: This endpoint needs to be implemented in AuthService
-        raise HTTPException(status_code=501, detail="Token refresh not yet implemented")
+        return await AuthService.refresh_access_token(request.refresh_token, db)
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
+@router.get("/verify-email", summary="Verify email address")
+async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
+    """Verify user email address with token from email."""
+    try:
+        return await AuthService.verify_email(token, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/resend-verification", summary="Resend verification email")
+async def resend_verification(email: str, db: AsyncSession = Depends(get_db)):
+    """Resend verification email to user."""
+    try:
+        return await AuthService.resend_verification_email(email, db)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

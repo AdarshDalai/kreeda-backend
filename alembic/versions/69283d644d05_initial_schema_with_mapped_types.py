@@ -1,8 +1,8 @@
-"""Initial user tables
+"""initial schema with mapped types
 
-Revision ID: 06c627dbae38
+Revision ID: 69283d644d05
 Revises: 
-Create Date: 2025-10-07 05:50:59.880382
+Create Date: 2025-10-10 16:08:44.052270
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '06c627dbae38'
+revision: str = '69283d644d05'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -25,11 +25,11 @@ def upgrade() -> None:
     sa.Column('email', sa.String(), nullable=False),
     sa.Column('password_hash', sa.String(), nullable=False),
     sa.Column('phone_number', sa.String(), nullable=True),
-    sa.Column('is_email_verified', sa.Boolean(), nullable=True),
-    sa.Column('is_phone_verified', sa.Boolean(), nullable=True),
+    sa.Column('is_email_verified', sa.Boolean(), nullable=False),
+    sa.Column('is_phone_verified', sa.Boolean(), nullable=False),
     sa.Column('last_login', sa.DateTime(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.PrimaryKeyConstraint('user_id'),
     sa.UniqueConstraint('email')
     )
@@ -41,10 +41,10 @@ def upgrade() -> None:
     sa.Column('location', sa.String(), nullable=True),
     sa.Column('date_of_birth', sa.Date(), nullable=True),
     sa.Column('bio', sa.Text(), nullable=True),
-    sa.Column('preferences', sa.JSON(), nullable=True),
-    sa.Column('roles', sa.JSON(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('preferences', sa.JSON(), nullable=False),
+    sa.Column('roles', sa.JSON(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('updated_at', sa.DateTime(), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['user_auth.user_id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('user_id')
