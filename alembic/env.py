@@ -21,7 +21,9 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from src.models.base import Base
-from src.models import user_auth, user_profile  # Import all models
+# Import all models for Alembic auto-detection
+from src.models import user_auth, user_profile, sport_profile, enums
+from src.models import cricket  # Import cricket module to register all cricket models
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

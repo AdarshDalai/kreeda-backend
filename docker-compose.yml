@@ -21,6 +21,8 @@ services:
       - POSTGRES_PASSWORD=kreeda_pass
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    command: postgres -c shared_preload_libraries=pg_stat_statements
 
   redis:
     image: redis:7-alpine
