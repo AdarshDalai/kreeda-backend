@@ -32,7 +32,7 @@ from src.schemas.cricket.team import (
     TeamCreateRequest, TeamUpdateRequest,
     TeamMembershipCreateRequest, TeamMembershipUpdateRequest,
     TeamResponse, TeamDetailResponse, TeamListResponse,
-    TeamMembershipResponse
+    TeamMembershipResponse, TeamColorsSchema, HomeGroundSchema
 )
 from src.core.exceptions import (
     NotFoundError, ValidationError, ForbiddenError,
@@ -430,16 +430,43 @@ class TeamService:
             
             member_responses.append(TeamMembershipResponse.model_validate(member))
             
-            # Build TeamDetailResponse with manual field setting
-            response_data = TeamDetailResponse.model_validate(team, from_attributes=True)
-            response_data.member_count = member_count
-            response_data.creator_name = creator_name
-            response_data.members = member_responses
+            # Build TeamDetailResponse manually to handle field name mapping
+            response_data = TeamDetailResponse(
+                id=team.id,
+                name=team.name,
+                short_name=team.short_name,
+                sport_type=team.sport_type,
+                team_type=team.team_type,
+                created_by=team.created_by_user_id,
+                logo_url=team.logo_url,
+                team_colors=TeamColorsSchema(**team.team_colors) if team.team_colors is not None else None,
+                home_ground=HomeGroundSchema(**team.home_ground) if team.home_ground is not None else None,
+                is_active=team.is_active,
+                created_at=team.created_at,
+                updated_at=team.updated_at,
+                member_count=member_count,
+                creator_name=creator_name,
+                members=member_responses
+            )
             return response_data
         else:
-            response_data = TeamResponse.model_validate(team, from_attributes=True)
-            response_data.member_count = member_count
-            response_data.creator_name = creator_name
+            # Build TeamResponse manually to handle field name mapping
+            response_data = TeamResponse(
+                id=team.id,
+                name=team.name,
+                short_name=team.short_name,
+                sport_type=team.sport_type,
+                team_type=team.team_type,
+                created_by=team.created_by_user_id,
+                logo_url=team.logo_url,
+                team_colors=TeamColorsSchema(**team.team_colors) if team.team_colors is not None else None,
+                home_ground=HomeGroundSchema(**team.home_ground) if team.home_ground is not None else None,
+                is_active=team.is_active,
+                created_at=team.created_at,
+                updated_at=team.updated_at,
+                member_count=member_count,
+                creator_name=creator_name
+            )
             return response_data
     
     @staticmethod
