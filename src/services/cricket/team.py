@@ -149,11 +149,22 @@ class TeamService:
             db.add(team)
             await db.flush()  # Get team ID
             
+            # Get user's sport profile for this sport type (if exists)
+            sport_profile_result = await db.execute(
+                select(SportProfile).where(
+                    and_(
+                        SportProfile.user_id == user_id,
+                        SportProfile.sport_type == request.sport_type
+                    )
+                )
+            )
+            sport_profile = sport_profile_result.scalar_one_or_none()
+            
             # Auto-add creator as team admin
             creator_membership = TeamMembership(
                 team_id=team.id,
                 user_id=user_id,
-                sport_profile_id=None,  # Will be populated if user has sport profile
+                sport_profile_id=sport_profile.id if sport_profile else None,
                 roles=[TeamMemberRole.TEAM_ADMIN.value],
                 status=MembershipStatus.ACTIVE,
                 joined_at=datetime.utcnow()
