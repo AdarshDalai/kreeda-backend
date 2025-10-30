@@ -379,7 +379,7 @@ class TeamService:
         if hasattr(team, 'creator') and team.creator:
             # Try to get display name from UserProfile
             user_profile_result = await db.execute(
-                select(UserProfile).where(UserProfile.user_id == team.created_by)
+                select(UserProfile).where(UserProfile.user_id == team.created_by_user_id)
             )
             user_profile = user_profile_result.scalar_one_or_none()
             creator_name = user_profile.name if user_profile else team.creator.email
@@ -725,7 +725,7 @@ class TeamService:
             select(Team).where(Team.id == team_id)
         )
         team = team_result.scalar_one_or_none()
-        if team and team.created_by == user_id:
+        if team and team.created_by_user_id == user_id:
             return True
         
         # Check if has team_admin role
