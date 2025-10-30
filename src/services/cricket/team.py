@@ -192,7 +192,7 @@ class TeamService:
                 creator_name=creator_name
             )
             
-        except (NotFoundError, DuplicateError):
+        except (NotFoundError, ConflictError):
             await db.rollback()
             raise
         except Exception as e:
