@@ -184,7 +184,7 @@ class TeamService:
                 select(UserProfile).where(UserProfile.user_id == user_id)
             )
             user_profile = user_profile_result.scalar_one_or_none()
-            creator_name = user_profile.display_name if user_profile else None
+            creator_name = user_profile.name if user_profile else None
             
             return TeamResponse(
                 id=team.id,
@@ -382,7 +382,7 @@ class TeamService:
                 select(UserProfile).where(UserProfile.user_id == team.created_by)
             )
             user_profile = user_profile_result.scalar_one_or_none()
-            creator_name = user_profile.display_name if user_profile else team.creator.email
+            creator_name = user_profile.name if user_profile else team.creator.email
         
         if include_members:
             # Get members with user details
@@ -409,7 +409,7 @@ class TeamService:
                         select(UserProfile).where(UserProfile.user_id == member.user_id)
                     )
                     user_profile = user_profile_result.scalar_one_or_none()
-                    user_name = user_profile.display_name if user_profile else member.user.email
+                    user_name = user_profile.name if user_profile else member.user.email
                 
                 if hasattr(member, 'cricket_profile') and member.cricket_profile:
                     cricket_profile_name = member.cricket_profile.player_name
