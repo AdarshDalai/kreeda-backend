@@ -528,3 +528,9 @@ class BallStatisticsSchema(BaseModel):
             }
         }
     )
+
+
+# Rebuild models to resolve forward references
+BallCreateRequest.model_rebuild()
+BallResponse.model_rebuild()
+
