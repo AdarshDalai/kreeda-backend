@@ -4,6 +4,7 @@ from src.routers.user_profile import router as user_profile_router
 from src.routers.cricket.profile import router as cricket_profile_router
 from src.routers.cricket.team import router as cricket_team_router
 from src.routers.cricket.match import router as cricket_match_router
+from src.routers.cricket.live_scoring import router as cricket_live_scoring_router
 from src.middleware.error_handler import register_exception_handlers
 
 app = FastAPI(
@@ -21,6 +22,7 @@ app.include_router(user_profile_router)
 app.include_router(cricket_profile_router)
 app.include_router(cricket_team_router, prefix="/api/v1/cricket")
 app.include_router(cricket_match_router, prefix="/api/v1/cricket")
+app.include_router(cricket_live_scoring_router, prefix="/api/v1")  # Live scoring endpoints
 
 @app.get("/health")
 async def health_check():
