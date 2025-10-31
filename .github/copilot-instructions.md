@@ -423,6 +423,14 @@ When adding new sports (football, hockey):
 ## Implementation Status & Next Steps
 
 ### Completed
+- ✅ **Phase 1**: Cricket Profiles (merged to master, v1.0.0-phase1-cricket-profiles)
+  - Sport profiles and cricket player profiles
+  - 17 unit tests, 100% passing
+- ✅ **Phase 2**: Teams & Match Management (merged to master, v2.0.0-phase2-teams-matches)
+  - Team CRUD with JSONB support (colors, home ground)
+  - Match creation, toss management, state machine
+  - 44 tests total (24 unit + 3 integration), 61% coverage
+  - 11 REST API endpoints
 - ✅ Base authentication system (Supabase-compatible)
 - ✅ User profile management
 - ✅ Database schema design (all models defined)
@@ -430,13 +438,35 @@ When adding new sports (football, hockey):
 - ✅ Docker containerization
 - ✅ Redis configuration
 
-### In Progress
-- 🚧 Cricket-specific routers and services
-- 🚧 Testing infrastructure setup
+### Current Phase: Phase 3 - Live Scoring & Event Sourcing
+- 🚧 Ball-by-ball event sourcing implementation
+- 🚧 Multi-scorer validation/consensus system
+- 🚧 Performance aggregation (real-time statistics)
+- 🚧 WebSocket support for live match updates
+- 🚧 Match archives and replay capability
 
-### Next Development Priorities
-1. Complete cricket routers/services (match creation, live scoring)
-2. Implement multi-scorer validation/consensus logic
-3. Add WebSocket support for live match updates
-4. Build aggregation jobs for player statistics
-5. Add comprehensive test coverage
+### Next Development Priorities (Phase 3)
+1. **Ball-by-Ball Event Sourcing**
+   - Implement innings, overs, balls, wickets models
+   - Event sourcing pattern: immutable ball records
+   - Derive current state from event log
+   
+2. **Multi-Scorer Validation System**
+   - Implement scoring_events, scoring_disputes, scoring_consensus
+   - Build consensus algorithm (TRIPLE/DUAL/SINGLE/HONOR tiers)
+   - Blockchain-like event hashing for integrity
+   
+3. **Performance Aggregation**
+   - Real-time batting_innings, bowling_figures updates
+   - Partnership tracking
+   - Statistical calculations (run rate, economy, strike rate)
+   
+4. **WebSocket Implementation**
+   - Real-time match updates for spectators
+   - Event broadcasting (BALL_BOWLED, WICKET_FALLEN, etc.)
+   - Connection management for live matches
+   
+5. **Match Archives**
+   - Post-match summary generation
+   - Ball-by-ball replay capability
+   - Highlight extraction and storage
