@@ -152,5 +152,5 @@ logs/
 *.log
 .env
 
-# docs
-docs/
+# docs (keep docs/ tracked for project documentation)
+# docs/
