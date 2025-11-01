@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.connection import get_db
 from src.services.cricket.innings_service import InningsService
 from src.services.cricket.ball_service import BallService
+from src.core.websocket_manager import get_connection_manager, ConnectionManager
 from src.schemas.cricket.innings import (
     InningsCreateRequest,
     InningsResponse,
@@ -336,11 +337,12 @@ async def create_over(
 )
 async def record_ball(
     request: BallCreateRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    connection_manager: ConnectionManager = Depends(get_connection_manager)
 ):
     """Record ball bowled"""
     try:
-        return await BallService.record_ball(request, db)
+        return await BallService.record_ball(request, db, connection_manager)
     except NotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
