@@ -33,6 +33,8 @@ from src.schemas.cricket.ball import (
     WicketDetailsSchema
 )
 from src.core.exceptions import NotFoundError, ValidationError
+from src.core.websocket_manager import ConnectionManager
+from src.schemas.cricket.websocket import WebSocketEventType
 
 
 class BallService:
@@ -49,7 +51,8 @@ class BallService:
     @staticmethod
     async def record_ball(
         request: BallCreateRequest,
-        db: AsyncSession
+        db: AsyncSession,
+        connection_manager: Optional[ConnectionManager] = None
     ) -> BallResponse:
         """
         Record a ball bowled (PRIMARY SCORING ENDPOINT)
@@ -61,7 +64,8 @@ class BallService:
             4. Update innings aggregates (runs, wickets, overs)
             5. Update over aggregates
             6. Check for over completion
-            7. Return BallResponse with enriched data
+            7. Broadcast WebSocket events to spectators
+            8. Return BallResponse with enriched data
         
         This is the ATOMIC UNIT of cricket scoring.
         Every legal delivery and extra creates a Ball record.
@@ -69,6 +73,7 @@ class BallService:
         Args:
             request: Ball details
             db: Database session
+            connection_manager: WebSocket manager for broadcasting (optional)
             
         Returns:
             BallResponse with ball and wicket details
@@ -169,7 +174,18 @@ class BallService:
         await db.refresh(ball)
         
         # Build enriched response
-        return await BallService._build_ball_response(ball, wicket, db)
+        ball_response = await BallService._build_ball_response(ball, wicket, db)
+        
+        # Broadcast WebSocket events to spectators
+        if connection_manager:
+            await BallService._broadcast_ball_events(
+                innings,
+                ball_response,
+                over,
+                connection_manager
+            )
+        
+        return ball_response
     
     @staticmethod
     async def _create_wicket(
@@ -585,3 +601,121 @@ class BallService:
         await db.refresh(over)
         
         return over
+    
+    @staticmethod
+    async def _broadcast_ball_events(
+        innings: Innings,
+        ball_response: BallResponse,
+        over: Over,
+        connection_manager: ConnectionManager
+    ) -> None:
+        """
+        Broadcast WebSocket events for ball bowled.
+        
+        Events Broadcast:
+        - BALL_BOWLED (always)
+        - WICKET_FALLEN (if wicket)
+        - OVER_COMPLETE (if over finished)
+        
+        Args:
+            innings: Innings model
+            ball_response: Enriched ball response
+            over: Over model  
+            connection_manager: WebSocket manager
+        """
+        match_id = str(innings.match_id)
+        
+        # 1. Broadcast BALL_BOWLED event
+        ball_event = {
+            "type": WebSocketEventType.BALL_BOWLED.value,
+            "data": {
+                "ball_id": str(ball_response.id),
+                "innings_id": str(ball_response.innings_id),
+                "over_number": ball_response.over_number,
+                "ball_number": ball_response.ball_number,
+                "bowler": {
+                    "player_id": str(ball_response.bowler_user_id),
+                    "player_name": "Bowler"  # TODO: Get from UserAuth join
+                },
+                "batsman": {
+                    "player_id": str(ball_response.batsman_user_id),
+                    "player_name": "Batsman"  # TODO: Get from UserAuth join
+                },
+                "runs_scored": ball_response.runs_scored,
+                "is_boundary": ball_response.is_boundary,
+                "boundary_type": ball_response.boundary_type.value if ball_response.boundary_type else None,
+                "extras": {
+                    "type": ball_response.extra_type.value if ball_response.extra_type else None,
+                    "runs": ball_response.extra_runs
+                } if ball_response.extra_runs > 0 else None,
+                "is_wicket": ball_response.is_wicket,
+                "innings_state": {
+                    "score": f"{innings.total_runs}/{innings.wickets_fallen}",
+                    "overs": float(innings.total_overs),
+                    "run_rate": innings.run_rate,
+                    "wickets": innings.wickets_fallen
+                },
+                "commentary": None  # TODO: Add commentary generation
+            }
+        }
+        
+        await connection_manager.broadcast_to_match(match_id, ball_event)
+        
+        # 2. Broadcast WICKET_FALLEN if wicket
+        if ball_response.is_wicket and ball_response.wicket:
+            wicket_event = {
+                "type": WebSocketEventType.WICKET_FALLEN.value,
+                "data": {
+                    "ball_id": str(ball_response.id),
+                    "wicket_id": str(ball_response.wicket.id),
+                    "dismissal_type": ball_response.wicket.dismissal_type.value,
+                    "batsman_out": {
+                        "player_id": str(ball_response.wicket.batsman_out_user_id),
+                        "player_name": "Batsman",  # TODO: Get from UserAuth
+                        "runs": 0,  # TODO: Get from batting_innings aggregate
+                        "balls": 0
+                    },
+                    "bowler": {
+                        "player_id": str(ball_response.wicket.bowler_user_id) if ball_response.wicket.bowler_user_id else "",
+                        "player_name": "Bowler"
+                    },
+                    "fielder": {
+                        "player_id": str(ball_response.wicket.fielder_user_id),
+                        "player_name": "Fielder"
+                    } if ball_response.wicket.fielder_user_id else None,
+                    "innings_state": {
+                        "score": f"{innings.total_runs}/{innings.wickets_fallen}",
+                        "overs": float(innings.total_overs),
+                        "wickets": innings.wickets_fallen
+                    },
+                    "fall_of_wicket": f"{innings.total_runs}/{innings.wickets_fallen} ({innings.total_overs} overs)",
+                    "commentary": None  # TODO: Generate wicket commentary
+                }
+            }
+            
+            await connection_manager.broadcast_to_match(match_id, wicket_event)
+        
+        # 3. Broadcast OVER_COMPLETE if over finished
+        if over.is_completed:
+            over_event = {
+                "type": WebSocketEventType.OVER_COMPLETE.value,
+                "data": {
+                    "innings_id": str(innings.id),
+                    "over_number": over.over_number,
+                    "bowler": {
+                        "player_id": str(over.bowler_user_id),
+                        "player_name": "Bowler"  # TODO: Get from UserAuth
+                    },
+                    "runs_in_over": over.runs_conceded,
+                    "wickets_in_over": over.wickets_taken,
+                    "balls_summary": over.ball_sequence or [],
+                    "innings_state": {
+                        "score": f"{innings.total_runs}/{innings.wickets_fallen}",
+                        "overs": float(innings.total_overs),
+                        "run_rate": innings.run_rate
+                    },
+                    "next_bowler": None  # TODO: Get next bowler if available
+                }
+            }
+            
+            await connection_manager.broadcast_to_match(match_id, over_event)
