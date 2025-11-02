@@ -1196,46 +1196,560 @@ Response: 200 OK
 
 ## Real-time Features (WebSocket)
 
+**Status**: ✅ IMPLEMENTED (Phase 4)  
+**Documentation**: See `docs/PHASE4_WEBSOCKET_DESIGN.md` for complete specifications
+
 ### WebSocket Endpoints
 
 #### Connect to Live Match
-```
-WS /ws/matches/{match_id}/live
-Authorization: Bearer <token> (in query param or header)
+**Status**: ✅ IMPLEMENTED
 
-On Connect:
+```
+WS /api/v1/cricket/ws/matches/{match_id}/live?token=<jwt_token>
+
+Authorization: JWT token in query parameter (required)
+Connection Type: Room-based (one room per match_id)
+```
+
+**Authentication**:
+- Query parameter: `?token=<your_jwt_token>`
+- Token validated on connection
+- Invalid/expired token: 403 Forbidden response
+- Auto-disconnect on token expiry
+
+**On Connect - Sent to Client**:
+```json
 {
-  "type": "CONNECTED",
+  "type": "CONNECTION_ESTABLISHED",
   "data": {
     "match_id": "uuid-match-1",
-    "current_state": { /* full match state */ }
-  }
+    "connected_at": "2025-11-01T15:30:00Z",
+    "current_state": {
+      "match_status": "IN_PROGRESS",
+      "current_innings": 1,
+      "batting_team_id": "uuid-team-1",
+      "bowling_team_id": "uuid-team-2",
+      "score": "145/4",
+      "overs": 15.3,
+      "striker": {
+        "player_id": "uuid-player-1",
+        "player_name": "John Doe",
+        "runs": 45,
+        "balls": 32,
+        "fours": 5,
+        "sixes": 1,
+        "strike_rate": 140.62
+      },
+      "non_striker": {
+        "player_id": "uuid-player-2",
+        "player_name": "Jane Smith",
+        "runs": 23,
+        "balls": 18,
+        "fours": 3,
+        "sixes": 0,
+        "strike_rate": 127.78
+      },
+      "bowler": {
+        "player_id": "uuid-player-3",
+        "player_name": "Bob Wilson",
+        "overs": 3.3,
+        "runs": 28,
+        "wickets": 1,
+        "economy": 8.24
+      }
+    }
+  },
+  "timestamp": "2025-11-01T15:30:00.123Z"
 }
+```
 
-Events Received:
-1. BALL_BOWLED
+---
+
+### Real-time Events
+
+**Events Broadcast** (automatically sent to all spectators when events occur):
+
+#### 1. BALL_BOWLED
+**Sent**: After every legal delivery
+
+```json
 {
   "type": "BALL_BOWLED",
   "data": {
-    "ball": { /* ball details */ },
-    "innings_state": { /* updated state */ }
+    "ball_id": "uuid-ball-123",
+    "ball_number": 1,
+    "over_number": 16,
+    "innings_id": "uuid-innings-1",
+    "runs_scored": 4,
+    "runs_type": "BATTER",
+    "is_boundary": true,
+    "boundary_type": "FOUR",
+    "extras": null,
+    "is_wicket": false,
+    "striker": {
+      "player_id": "uuid-player-1",
+      "player_name": "John Doe",
+      "runs": 49,
+      "balls": 33,
+      "fours": 6,
+      "sixes": 1,
+      "strike_rate": 148.48
+    },
+    "bowler": {
+      "player_id": "uuid-player-3",
+      "player_name": "Bob Wilson",
+      "overs": 3.4,
+      "runs": 32,
+      "wickets": 1,
+      "economy": 8.73
+    },
+    "innings_state": {
+      "score": "149/4",
+      "overs": 15.4,
+      "run_rate": 9.49,
+      "wickets": 4,
+      "balls_remaining": 26,
+      "required_run_rate": null
+    },
+    "commentary": "Short delivery, pulled away for FOUR! Excellent shot by John Doe."
   },
-  "timestamp": "2025-10-27T15:32:45Z"
+  "timestamp": "2025-11-01T15:32:45.456Z"
 }
-
-2. WICKET_FALLEN
-3. OVER_COMPLETE
-4. INNINGS_COMPLETE
-5. MATCH_COMPLETE
-6. SCORING_DISPUTE_RAISED
-7. DISPUTE_RESOLVED
-8. PLAYER_CHANGED (batsman/bowler change)
 ```
+
+#### 2. WICKET_FALLEN
+**Sent**: When a batsman is dismissed
+
+```json
+{
+  "type": "WICKET_FALLEN",
+  "data": {
+    "wicket_id": "uuid-wicket-1",
+    "ball_id": "uuid-ball-124",
+    "batsman_out": {
+      "player_id": "uuid-player-1",
+      "player_name": "John Doe",
+      "runs": 49,
+      "balls": 33,
+      "fours": 6,
+      "sixes": 1
+    },
+    "dismissal_type": "CAUGHT",
+    "bowler": {
+      "player_id": "uuid-player-3",
+      "player_name": "Bob Wilson"
+    },
+    "fielder": {
+      "player_id": "uuid-player-5",
+      "player_name": "Mike Johnson"
+    },
+    "fall_of_wicket": {
+      "wicket_number": 5,
+      "score": "149/5",
+      "overs": 15.4
+    },
+    "partnership": {
+      "runs": 68,
+      "balls": 42,
+      "partner": {
+        "player_id": "uuid-player-2",
+        "player_name": "Jane Smith"
+      }
+    },
+    "innings_state": {
+      "score": "149/5",
+      "overs": 15.4,
+      "run_rate": 9.49,
+      "wickets": 5
+    }
+  },
+  "timestamp": "2025-11-01T15:33:12.789Z"
+}
+```
+
+#### 3. OVER_COMPLETE
+**Sent**: At the end of each over
+
+```json
+{
+  "type": "OVER_COMPLETE",
+  "data": {
+    "over_id": "uuid-over-16",
+    "over_number": 16,
+    "innings_id": "uuid-innings-1",
+    "bowler": {
+      "player_id": "uuid-player-3",
+      "player_name": "Bob Wilson"
+    },
+    "runs_conceded": 12,
+    "wickets": 1,
+    "balls": [
+      {"ball_number": 1, "runs": 4, "is_wicket": false, "is_boundary": true},
+      {"ball_number": 2, "runs": 0, "is_wicket": true, "is_boundary": false},
+      {"ball_number": 3, "runs": 1, "is_wicket": false, "is_boundary": false},
+      {"ball_number": 4, "runs": 6, "is_wicket": false, "is_boundary": true},
+      {"ball_number": 5, "runs": 0, "is_wicket": false, "is_boundary": false},
+      {"ball_number": 6, "runs": 1, "is_wicket": false, "is_boundary": false}
+    ],
+    "innings_state": {
+      "score": "161/5",
+      "overs": 16.0,
+      "run_rate": 10.06,
+      "wickets": 5
+    },
+    "next_bowler": {
+      "player_id": "uuid-player-6",
+      "player_name": "Tom Brown"
+    }
+  },
+  "timestamp": "2025-11-01T15:35:00.123Z"
+}
+```
+
+#### 4. INNINGS_COMPLETE
+**Sent**: When an innings ends  
+**Status**: 🚧 Coming in Phase 5
+
+```json
+{
+  "type": "INNINGS_COMPLETE",
+  "data": {
+    "innings_id": "uuid-innings-1",
+    "innings_number": 1,
+    "batting_team_id": "uuid-team-1",
+    "final_score": "165/8",
+    "overs": 20.0,
+    "run_rate": 8.25,
+    "top_scorer": {
+      "player_id": "uuid-player-1",
+      "player_name": "John Doe",
+      "runs": 65,
+      "balls": 42
+    },
+    "top_bowler": {
+      "player_id": "uuid-player-3",
+      "player_name": "Bob Wilson",
+      "wickets": 3,
+      "runs": 28,
+      "overs": 4.0
+    },
+    "target": 166
+  },
+  "timestamp": "2025-11-01T16:00:00.000Z"
+}
+```
+
+#### 5. MATCH_COMPLETE
+**Sent**: When match finishes  
+**Status**: 🚧 Coming in Phase 5
+
+```json
+{
+  "type": "MATCH_COMPLETE",
+  "data": {
+    "match_id": "uuid-match-1",
+    "result": "Team A won by 15 runs",
+    "winning_team_id": "uuid-team-1",
+    "player_of_match": {
+      "player_id": "uuid-player-1",
+      "player_name": "John Doe"
+    },
+    "final_scores": {
+      "team_a": "165/8 (20.0 overs)",
+      "team_b": "150/10 (18.3 overs)"
+    }
+  },
+  "timestamp": "2025-11-01T17:30:00.000Z"
+}
+```
+
+#### 6. SCORING_DISPUTE_RAISED
+**Sent**: When scorers disagree (multi-scorer validation)  
+**Status**: 🚧 Coming in Phase 5
+
+```json
+{
+  "type": "SCORING_DISPUTE_RAISED",
+  "data": {
+    "dispute_id": "uuid-dispute-1",
+    "ball_number": 1,
+    "over_number": 10,
+    "scorer_a_version": {"runs": 4, "is_boundary": true},
+    "scorer_b_version": {"runs": 1, "is_boundary": false},
+    "status": "PENDING",
+    "requires_umpire": true
+  },
+  "timestamp": "2025-11-01T15:45:00.000Z"
+}
+```
+
+#### 7. DISPUTE_RESOLVED
+**Sent**: When scoring consensus is reached  
+**Status**: 🚧 Coming in Phase 5
+
+```json
+{
+  "type": "DISPUTE_RESOLVED",
+  "data": {
+    "dispute_id": "uuid-dispute-1",
+    "resolved_by": "UMPIRE",
+    "final_decision": {"runs": 4, "is_boundary": true},
+    "ball_id": "uuid-ball-125"
+  },
+  "timestamp": "2025-11-01T15:46:30.000Z"
+}
+```
+
+#### 8. PLAYER_CHANGED
+**Sent**: When batsman rotates strike or new batsman/bowler  
+**Status**: 🚧 Coming in Phase 5
+
+```json
+{
+  "type": "PLAYER_CHANGED",
+  "data": {
+    "change_type": "NEW_BATSMAN",
+    "player_in": {
+      "player_id": "uuid-player-7",
+      "player_name": "Chris Davis",
+      "position": "STRIKER"
+    },
+    "player_out": {
+      "player_id": "uuid-player-1",
+      "player_name": "John Doe"
+    }
+  },
+  "timestamp": "2025-11-01T15:33:15.000Z"
+}
+```
+
+#### 9. MILESTONE_ACHIEVED
+**Sent**: When player reaches milestone (fifty, century, hat-trick)  
+**Status**: 🚧 Coming in Phase 5
+
+```json
+{
+  "type": "MILESTONE_ACHIEVED",
+  "data": {
+    "milestone_type": "CENTURY",
+    "player": {
+      "player_id": "uuid-player-1",
+      "player_name": "John Doe"
+    },
+    "value": 100,
+    "balls_taken": 58
+  },
+  "timestamp": "2025-11-01T16:15:00.000Z"
+}
+```
+
+#### 10. ERROR
+**Sent**: On system errors or authentication failures
+
+```json
+{
+  "type": "ERROR",
+  "data": {
+    "error_code": "AUTH_TOKEN_EXPIRED",
+    "message": "Your authentication token has expired. Please reconnect with a new token.",
+    "severity": "CRITICAL",
+    "action": "DISCONNECT"
+  },
+  "timestamp": "2025-11-01T17:00:00.000Z"
+}
+```
+
+---
+
+### Client Implementation Examples
+
+#### JavaScript Client
+```javascript
+// Connect to live match
+const matchId = 'abc-123-def-456';
+const token = localStorage.getItem('jwt_token');
+
+const ws = new WebSocket(
+  `ws://localhost:8000/api/v1/cricket/ws/matches/${matchId}/live?token=${token}`
+);
+
+ws.onopen = () => {
+  console.log('✅ Connected to live match');
+};
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  
+  switch (data.type) {
+    case 'CONNECTION_ESTABLISHED':
+      console.log('Current match state:', data.data.current_state);
+      updateScoreboard(data.data.current_state);
+      break;
+    
+    case 'BALL_BOWLED':
+      console.log(`Ball: ${data.data.runs_scored} runs`);
+      updateLiveScore(data.data.innings_state);
+      showBallAnimation(data.data);
+      break;
+    
+    case 'WICKET_FALLEN':
+      console.log(`Wicket! ${data.data.batsman_out.player_name} out`);
+      showWicketAlert(data.data);
+      break;
+    
+    case 'OVER_COMPLETE':
+      console.log(`Over ${data.data.over_number} complete: ${data.data.runs_conceded} runs`);
+      updateOverSummary(data.data);
+      break;
+    
+    case 'ERROR':
+      console.error('WebSocket error:', data.data.message);
+      if (data.data.action === 'DISCONNECT') {
+        ws.close();
+        showReconnectPrompt();
+      }
+      break;
+  }
+};
+
+ws.onerror = (error) => {
+  console.error('WebSocket error:', error);
+};
+
+ws.onclose = () => {
+  console.log('❌ Disconnected from live match');
+  showReconnectPrompt();
+};
+
+// Heartbeat (keep connection alive)
+setInterval(() => {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send('ping');
+  }
+}, 30000); // Every 30 seconds
+
+// Graceful disconnect
+function disconnect() {
+  ws.send('close');
+  ws.close();
+}
+```
+
+#### Python Client (for testing)
+```python
+import asyncio
+import websockets
+import json
+
+async def watch_match(match_id: str, token: str):
+    uri = f'ws://localhost:8000/api/v1/cricket/ws/matches/{match_id}/live?token={token}'
+    
+    async with websockets.connect(uri) as websocket:
+        print('✅ Connected to live match')
+        
+        while True:
+            try:
+                message = await websocket.recv()
+                data = json.loads(message)
+                
+                if data['type'] == 'CONNECTION_ESTABLISHED':
+                    print(f"Match state: {data['data']['current_state']}")
+                
+                elif data['type'] == 'BALL_BOWLED':
+                    print(f"Ball: {data['data']['runs_scored']} runs")
+                    print(f"Score: {data['data']['innings_state']['score']}")
+                
+                elif data['type'] == 'WICKET_FALLEN':
+                    print(f"Wicket: {data['data']['batsman_out']['player_name']} out")
+                
+                elif data['type'] == 'OVER_COMPLETE':
+                    print(f"Over {data['data']['over_number']} complete")
+                
+                elif data['type'] == 'ERROR':
+                    print(f"Error: {data['data']['message']}")
+                    if data['data']['action'] == 'DISCONNECT':
+                        break
+            
+            except websockets.exceptions.ConnectionClosed:
+                print('❌ Connection closed')
+                break
+
+# Usage
+asyncio.run(watch_match('abc-123-def-456', 'your_jwt_token'))
+```
+
+---
+
+### Connection Lifecycle
+
+**1. Connection Establishment**:
+- Client connects with JWT token in query parameter
+- Server validates token
+- Server accepts connection and adds to match room
+- Server sends CONNECTION_ESTABLISHED event
+
+**2. Active Session**:
+- Client receives real-time events as match progresses
+- Client sends heartbeat (ping) every 30 seconds
+- Server responds with pong
+
+**3. Graceful Disconnect**:
+- Client sends "close" message
+- Server removes from room
+- Connection closed
+
+**4. Error Handling**:
+- Invalid token: 403 Forbidden (connection rejected)
+- Expired token: ERROR event sent, then disconnect
+- Network failure: Auto-reconnect with exponential backoff
+
+---
+
+### Performance & Scalability
+
+**Current Implementation (Phase 4)**:
+- In-memory ConnectionManager (single server)
+- Room-based broadcasting (one room per match)
+- Thread-safe with asyncio locks
+- Expected load:
+  - Casual match: 5-20 spectators
+  - League match: 50-200 spectators
+  - Tournament final: 500-2,000 spectators
+
+**Future Scaling (Phase 6)**:
+- Redis Pub/Sub for multi-server
+- Load balancer with sticky sessions
+- Horizontal scaling support
+- Expected: 10,000+ concurrent spectators across all matches
+
+---
+
+### WebSocket Best Practices
+
+**For Clients**:
+1. **Always include heartbeat** (ping every 30 seconds)
+2. **Handle reconnection** with exponential backoff
+3. **Store token securely** (localStorage/sessionStorage)
+4. **Listen for ERROR events** and handle gracefully
+5. **Update UI optimistically** while waiting for server confirmation
+
+**For Spectators**:
+- Read-only connection (no sending data to server)
+- Receive events passively
+- Disconnect when leaving match view
+
+**For Scorers** (Future):
+- Use REST API for submitting balls (not WebSocket)
+- Connect to WebSocket for real-time feedback
+- Handle SCORING_DISPUTE events
+
+---
 
 #### Subscribe to Multiple Matches
+**Status**: 🚧 Coming in Phase 6
+
 ```
-WS /ws/matches/feed
-Authorization: Bearer <token>
+WS /api/v1/cricket/ws/matches/feed?token=<jwt_token>
 
 On Connect - Send:
 {
